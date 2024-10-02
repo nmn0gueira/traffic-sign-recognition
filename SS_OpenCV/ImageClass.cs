@@ -526,7 +526,9 @@ namespace SS_OpenCV
             }
         }
 
-        public static void Mean (Image<Bgr, byte> img, Image<Bgr, byte> imgCopy)
+
+
+        public static void MeanSolutionA(Image<Bgr, byte> img, Image<Bgr, byte> imgCopy, int maskSize)
         {
             unsafe
             {
@@ -547,35 +549,34 @@ namespace SS_OpenCV
                 int xDestin, yDestin, xOrigin, yOrigin;
                 int sumR, sumG, sumB;
 
-                int maskSize = 3;
-                int upperLimit = maskSize / 2;
-                int lowerLimit = -upperLimit;
+                int paddingLimit = maskSize / 2;
+                int negativePaddingLimit = -paddingLimit;
 
                 float count = maskSize * maskSize;
 
                 if (nChan == 3) // image in RGB
                 {
                     // Treat first line
-                    for (xDestin= 0; xDestin < width; xDestin++)
+                    for (xDestin = 0; xDestin < width; xDestin++)
                     {
                         sumB = 0;
                         sumG = 0;
                         sumR = 0;
 
 
-                        for (int i = lowerLimit; i <= upperLimit; i++)
+                        for (int i = negativePaddingLimit; i <= paddingLimit; i++)
                         {
-                            for (int j = lowerLimit; j <= upperLimit; j++)
+                            for (int j = negativePaddingLimit; j <= paddingLimit; j++)
                             {
                                 xOrigin = xDestin + j;
                                 yOrigin = i;
 
-                                if (xOrigin < 0 || xOrigin >= width) 
+                                if (xOrigin < 0 || xOrigin >= width)
                                 {
                                     xOrigin = xDestin;
                                 }
 
-                                if (yOrigin < 0 || yOrigin >= height)
+                                if (yOrigin < 0)
                                     yOrigin = 0;
 
                                 byte* dataPtrAux = dataPtrCopy + yOrigin * widthStep + xOrigin * nChan;
@@ -601,16 +602,16 @@ namespace SS_OpenCV
                         sumG = 0;
                         sumR = 0;
 
-                        for (int i = lowerLimit; i <= upperLimit; i++)
+                        for (int i = negativePaddingLimit; i <= paddingLimit; i++)
                         {
-                            for (int j = lowerLimit; j <= upperLimit; j++)
+                            for (int j = negativePaddingLimit; j <= paddingLimit; j++)
                             {
                                 xOrigin = j;
                                 yOrigin = yDestin + i;
 
-                                if (xOrigin < 0 || xOrigin >= width)
+                                if (xOrigin < 0)
                                     xOrigin = 0;
-                                
+
 
                                 if (yOrigin < 0 || yOrigin >= height)
                                     yOrigin = yDestin;
@@ -629,32 +630,115 @@ namespace SS_OpenCV
                         dataPtr += widthStep;
                     }
 
-                    
-                    
+                    // Return to the first pixel of the last line
+                    dataPtr -= widthStep;
+
+                    // Advance one pixel to the right
+                    dataPtr += nChan * 1;
+
+
+                    // Treat last line
+                    for (xDestin = 1; xDestin < width; xDestin++)
+                    {
+                        sumB = 0;
+                        sumG = 0;
+                        sumR = 0;
+
+
+                        for (int i = negativePaddingLimit; i <= paddingLimit; i++)
+                        {
+                            for (int j = negativePaddingLimit; j <= paddingLimit; j++)
+                            {
+                                xOrigin = xDestin + j;
+                                yOrigin = height - 1 + i;
+
+
+                                if (xOrigin < 0 || xOrigin >= width)
+                                    xOrigin = xDestin;
+
+                                if (yOrigin >= height)
+                                    yOrigin = height - 1;
+
+
+                                byte* dataPtrAux = dataPtrCopy + yOrigin * widthStep + xOrigin * nChan;
+                                sumB += dataPtrAux[0];
+                                sumG += dataPtrAux[1];
+                                sumR += dataPtrAux[2];
+                            }
+                        }
+
+                        dataPtr[0] = (byte)Math.Round(sumB / count);
+                        dataPtr[1] = (byte)Math.Round(sumG / count);
+                        dataPtr[2] = (byte)Math.Round(sumR / count);
+
+                        dataPtr += nChan;
+                    }
+
+                    // Advance the pointer to the last pixel of the last line and then retreat the pointer to the previous line
+                    dataPtr = dataPtr - widthStep - nChan;
+
+                    // Treat last column
+                    for (yDestin = height - 2; yDestin > 0; yDestin--)
+                    {
+                        sumB = 0;
+                        sumG = 0;
+                        sumR = 0;
+
+                        for (int i = negativePaddingLimit; i <= paddingLimit; i++)
+                        {
+                            for (int j = negativePaddingLimit; j <= paddingLimit; j++)
+                            {
+                                xOrigin = width - 1 + j;
+                                yOrigin = yDestin + i;
+
+                                if (xOrigin >= width)
+                                    xOrigin = width - 1;
+
+                                if (yOrigin < 0 || yOrigin >= height)
+                                    yOrigin = yDestin;
+
+                                byte* dataPtrAux = dataPtrCopy + yOrigin * widthStep + xOrigin * nChan;
+                                sumB += dataPtrAux[0];
+                                sumG += dataPtrAux[1];
+                                sumR += dataPtrAux[2];
+                            }
+                        }
+
+                        dataPtr[0] = (byte)Math.Round(sumB / count);
+                        dataPtr[1] = (byte)Math.Round(sumG / count);
+                        dataPtr[2] = (byte)Math.Round(sumR / count);
+
+                        dataPtr -= widthStep;
+
+                    }
+
+
+                    // Put the pointer in the first pixel of the first line
+                    dataPtr += 2 * nChan + padding;
 
                     // Treat core
                     for (yDestin = 1; yDestin < height - 1; yDestin++)
                     {
                         for (xDestin = 1; xDestin < width - 1; xDestin++)
                         {
-                           
+
                             sumB = 0;
                             sumG = 0;
                             sumR = 0;
-                            
 
-                            for (int i = lowerLimit; i <= upperLimit; i++)
+
+                            for (int i = negativePaddingLimit; i <= paddingLimit; i++)
                             {
-                                for (int j = lowerLimit; j <= upperLimit; j++)
+                                for (int j = negativePaddingLimit; j <= paddingLimit; j++)
                                 {
                                     xOrigin = xDestin + j;
                                     yOrigin = yDestin + i;
 
-                        
+
                                     byte* dataPtrAux = dataPtrCopy + yOrigin * widthStep + xOrigin * nChan;
                                     sumB += dataPtrAux[0];
                                     sumG += dataPtrAux[1];
-                                    sumR += dataPtrAux[2]; 
+                                    sumR += dataPtrAux[2];
                                 }
                             }
 
@@ -669,9 +753,15 @@ namespace SS_OpenCV
                         //at the end of the line advance the pointer by the alignment bytes (padding)
                         dataPtr += padding + 2 * nChan;
                     }
+
                 }
-                
+
             }
+        }
+
+        public static void Mean(Image<Bgr, byte> img, Image<Bgr, byte> imgCopy)
+        {
+            MeanSolutionA(img, imgCopy, 3);
         }
 
         /*
@@ -733,5 +823,5 @@ namespace SS_OpenCV
                 }
             }
         }*/
-    }
+                }
 }
