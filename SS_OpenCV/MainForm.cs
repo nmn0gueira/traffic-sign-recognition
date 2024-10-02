@@ -73,7 +73,10 @@ namespace SS_OpenCV
             Cursor = Cursors.WaitCursor;
             img = imgUndo.Copy();
 
-            UpdateUIAfterProcessing();
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
         }
 
         /// <summary>
@@ -114,12 +117,19 @@ namespace SS_OpenCV
         /// <param name="e"></param>
         private void negativeToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if (!PrepareForImageProcessing())
+            if(img == null) // verify if the image is already opened
                 return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
 
             ImageClass.Negative(img);
 
-            UpdateUIAfterProcessing();
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
         }
 
         /// <summary>
@@ -129,79 +139,123 @@ namespace SS_OpenCV
         /// <param name="e"></param>
         private void grayToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if (!PrepareForImageProcessing())
+            if (img == null) // verify if the image is already opened
                 return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
 
             ImageClass.ConvertToGray(img);
 
-            UpdateUIAfterProcessing();
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
         }
 
         private void redChannelToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if (!PrepareForImageProcessing())
+            if (img == null) // verify if the image is already opened
                 return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
 
             ImageClass.RedChannel(img);
 
-            UpdateUIAfterProcessing();
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
         }
 
 
         private void greenChannelToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if (!PrepareForImageProcessing())
+            if (img == null) // verify if the image is already opened
                 return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
 
             ImageClass.GreenChannel(img);
 
-            UpdateUIAfterProcessing();
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
         }
 
         private void blueChannelToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if (!PrepareForImageProcessing())
-                return;
+            if if (img == null) // verify if the image is already opened
+                    return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
 
             ImageClass.BlueChannel(img);
 
-            UpdateUIAfterProcessing();
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
         }
 
         private void translationToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            // get translation values
-            Tuple<int, int> translation = TranslationInputBox.GetValue("Translation");
-            if (translation == null)
+            if (img == null) // verify if the image is already opened
                 return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
 
-            if (!PrepareForImageProcessing())
-                return;
+            //copy Undo Image
+            imgUndo = img.Copy();
 
-            ImageClass.Translation(img, img.Copy(), translation.Item1, translation.Item2);
+            //ImageClass.Translation(img, img.Copy(), translation.Item1, translation.Item2);
 
-            UpdateUIAfterProcessing();
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
         }
 
         private void rotationToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if (!PrepareForImageProcessing())
+            if (img == null) // verify if the image is already opened
                 return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
 
-            
+            //copy Undo Image
+            imgUndo = img.Copy();
+
+            //
 
 
-            UpdateUIAfterProcessing();
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
         }
 
         private void zoomToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if (!PrepareForImageProcessing())
+            if (img == null) // verify if the image is already opened
                 return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
 
-            ImageClass.BlueChannel(img);
+            //copy Undo Image
+            imgUndo = img.Copy();
 
-            UpdateUIAfterProcessing();
+            //
+
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
         }
 
 
@@ -243,26 +297,6 @@ namespace SS_OpenCV
         private void colorToolStripMenuItem_Click(object sender, EventArgs e)
         {
 
-        }
-
-        private bool PrepareForImageProcessing()
-        {
-            if (img == null) // verify if the image is already opened
-                return false;
-            Cursor = Cursors.WaitCursor; // clock cursor 
-
-            //copy Undo Image
-            imgUndo = img.Copy();
-
-            return true;
-        }
-
-        private void UpdateUIAfterProcessing()
-        {
-            ImageViewer.Image = img;
-            ImageViewer.Refresh(); // refresh image on the screen
-
-            Cursor = Cursors.Default; // normal cursor 
         }
 
     }
