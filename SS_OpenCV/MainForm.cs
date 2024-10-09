@@ -191,8 +191,8 @@ namespace SS_OpenCV
 
         private void blueChannelToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if if (img == null) // verify if the image is already opened
-                    return;
+            if (img == null) // verify if the image is already opened
+                return;
             Cursor = Cursors.WaitCursor; // clock cursor 
 
             //copy Undo Image
@@ -299,6 +299,25 @@ namespace SS_OpenCV
 
         }
 
+        private void nonUniformToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            FilterForm ff = new FilterForm();
+
+            if (ff.ShowDialog() == DialogResult.OK)
+            {
+                Cursor = Cursors.WaitCursor; // clock cursor 
+
+                //copy Undo Image
+                imgUndo = img.Copy();
+
+                //ImageClass.NonUniformFilter(img, ff.Mask);
+
+                ImageViewer.Image = img;
+                ImageViewer.Refresh(); // refresh image on the screen
+
+                Cursor = Cursors.Default; // normal cursor
+            }
+        }
     }
 
 
