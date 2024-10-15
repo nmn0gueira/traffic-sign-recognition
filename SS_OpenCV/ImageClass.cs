@@ -874,7 +874,7 @@ namespace SS_OpenCV
                     // Treat right border
                     for (yDestin = halfDim; yDestin < height - halfDim; yDestin++)
                     {
-                        byte* rowDataPtr = dataPtrCopy + (yDestin - halfDim) * widthStep;
+                        
                         for (xDestin = width - halfDim; xDestin < width; xDestin++)
                         {
                             sumB = 0;
@@ -892,7 +892,7 @@ namespace SS_OpenCV
                                         xOrigin = width - 1;
 
 
-                                    byte* dataPtrAux = rowDataPtr + xOrigin * nChan;
+                                    byte* dataPtrAux = dataPtrCopy + yOrigin * widthStep + xOrigin * nChan;
                                     sumB += dataPtrAux[0];
                                     sumG += dataPtrAux[1];
                                     sumR += dataPtrAux[2];
@@ -1083,7 +1083,7 @@ namespace SS_OpenCV
                 NonUniformSeparable(img, u, v, matrixWeight, offset);
 
             else
-                NonUniformPadding(img, matrix, matrixWeight, offset);
+                NonUniformNoPad(img, imgCopy, matrix, matrixWeight, offset);
         }
 
         private static void NonUniformNoPad(Image<Bgr, byte> img, Image<Bgr, byte> imgCopy, float[,] matrix, float matrixWeight, float offset)
@@ -1243,7 +1243,6 @@ namespace SS_OpenCV
                     // Treat right border
                     for (yDestin = halfDim; yDestin < height - halfDim; yDestin++)
                     {
-                        byte* rowDataPtr = dataPtrCopy + (yDestin - halfDim) * widthStep;
                         for (xDestin = width - halfDim; xDestin < width; xDestin++)
                         {
                             sumB = 0;
@@ -1262,7 +1261,7 @@ namespace SS_OpenCV
                                         xOrigin = width - 1;
 
 
-                                    byte* dataPtrAux = rowDataPtr + xOrigin * nChan;
+                                    byte* dataPtrAux = dataPtrCopy + yOrigin * widthStep + xOrigin * nChan;
                                     sumB += matrix[matrixRow, matrixCol] * dataPtrAux[0];
                                     sumG += matrix[matrixRow, matrixCol] * dataPtrAux[1];
                                     sumR += matrix[matrixRow, matrixCol] * dataPtrAux[2];
@@ -1324,17 +1323,14 @@ namespace SS_OpenCV
             {
                 MIplImage m = img.MIplImage;
                 byte* dataPtr = (byte*)m.ImageData.ToPointer(); // Pointer to the image
-
                 int dim = u.Length;
                 int halfDim = dim / 2;
                 int minusHalfDim = -halfDim;
-
-                Image<Bgr, byte> imgCopyPadded = new Image<Bgr, byte>(img.Width + halfDim * 2, img.Height + halfDim * 2);
+                Image<Bgr, byte> imgCopyPadded = new Image<Bgr, Byte>(img.Width + halfDim * 2, img.Height + halfDim * 2);
                 // Pad the copy image using OpenCV
                 CvInvoke.CopyMakeBorder(img, imgCopyPadded, halfDim, halfDim, halfDim, halfDim, Emgu.CV.CvEnum.BorderType.Replicate);
                 MIplImage mCopy = imgCopyPadded.MIplImage;
                 byte* dataPtrCopy = (byte*)mCopy.ImageData.ToPointer(); // Pointer to the image
-
                 int width = imgCopyPadded.Width;
                 int height = imgCopyPadded.Height;
                 int nChan = m.NChannels; // number of channels - 3
@@ -1342,66 +1338,61 @@ namespace SS_OpenCV
                 int widthStep = mCopy.WidthStep;
                 int x, y;
                 float sumR, sumG, sumB;
-
-                int copyWidthStep = width * nChan;
-
+                int intermediateWidthStep = width * nChan; // Intermediate buffer does not have padding
                 // Create a buffer for the intermediate results (pointer)
                 float[] intermediateBuffer = new float[imgCopyPadded.Width * img.Height * nChan];
-
                 fixed (float* p = intermediateBuffer)
                 {
                     float* intermediateBufferPtr = p;
-
                     if (nChan == 3) // image in RGB
                     {
                         for (y = halfDim; y < height - halfDim; y++)
                         {
+                            byte* rowDataPtr = dataPtrCopy + (y - halfDim) * widthStep;
+
                             for (x = 0; x < width; x++)
                             {
                                 sumB = 0;
                                 sumG = 0;
                                 sumR = 0;
-                                byte* dataPtrAux = dataPtrCopy + (y - halfDim) * widthStep + x * nChan;
+                                byte* dataPtrAux = rowDataPtr + x * nChan;
 
                                 for (int i = minusHalfDim, row = 0; i <= halfDim; i++, row++)
                                 {
                                     sumB += u[row] * dataPtrAux[0];
                                     sumG += u[row] * dataPtrAux[1];
                                     sumR += u[row] * dataPtrAux[2];
-
                                     dataPtrAux += widthStep;
                                 }
 
                                 intermediateBufferPtr[0] = sumB;
                                 intermediateBufferPtr[1] = sumG;
                                 intermediateBufferPtr[2] = sumR;
-
                                 intermediateBufferPtr += nChan;
                             }
                         }
 
-                        for (y = 0; y < height; y++)
+                        for (y = halfDim; y < height - halfDim; y++)
                         {
+                            float* rowDataPtr = p + (y - halfDim) * intermediateWidthStep;
+
                             for (x = halfDim; x < width - halfDim; x++)
                             {
                                 sumB = 0;
                                 sumG = 0;
                                 sumR = 0;
-                                float* dataPtrAux = p + y * copyWidthStep + (x - halfDim) * nChan;
 
+                                float* dataPtrAux = rowDataPtr + (x - halfDim) * nChan;
                                 for (int i = minusHalfDim, col = 0; i <= halfDim; i++, col++)
                                 {
                                     sumB += v[col] * dataPtrAux[0];
                                     sumG += v[col] * dataPtrAux[1];
                                     sumR += v[col] * dataPtrAux[2];
-
                                     dataPtrAux += nChan;
                                 }
-
                                 dataPtr[0] = (byte)Clamp(Math.Round(sumB / matrixWeight + offset), 0, 255);
                                 dataPtr[1] = (byte)Clamp(Math.Round(sumG / matrixWeight + offset), 0, 255);
                                 dataPtr[2] = (byte)Clamp(Math.Round(sumR / matrixWeight + offset), 0, 255);
-
                                 dataPtr += nChan;
                             }
                             dataPtr += padding;
@@ -1421,25 +1412,25 @@ namespace SS_OpenCV
             unsafe
             {
                 MIplImage m = img.MIplImage;
-                byte* dataPtr = (byte*)m.ImageData.ToPointer(); // Pointer to the image
+                byte* dataPtr = (byte*)m.ImageData.ToPointer(); // Pointer to the original image
 
                 Image<Bgr, byte> imgCopyPadded = new Image<Bgr, byte>(img.Width + 2, img.Height + 2);
                 // Pad the copy image using OpenCV
                 CvInvoke.CopyMakeBorder(img, imgCopyPadded, 1, 1, 1, 1, Emgu.CV.CvEnum.BorderType.Replicate);
                 MIplImage mCopy = imgCopyPadded.MIplImage;
-                byte* dataPtrCopy = (byte*)mCopy.ImageData.ToPointer(); // Pointer to the image
+                byte* dataPtrCopy = (byte*)mCopy.ImageData.ToPointer(); // Pointer to the padded image
 
                 int width = imgCopyPadded.Width;
                 int height = imgCopyPadded.Height;
-                int nChan = m.NChannels; // number of channels - 3
-                int padding = m.WidthStep - m.NChannels * m.Width; // alingnment bytes (padding)
+                int nChan = m.NChannels; // Number of channels - 3 for RGB
+                int padding = m.WidthStep - m.NChannels * m.Width; // Alignment bytes (padding)
                 int widthStep = mCopy.WidthStep;
-                int filterLineAdvance = widthStep - 2 * nChan;
+                int filterLineAdvance = widthStep - 2 * nChan; // Step for moving one line down during filtering
                 int x, y;
                 int verticalSumR, verticalSumG, verticalSumB;
                 int horizontalSumR, horizontalSumG, horizontalSumB;
 
-                if (nChan == 3) // image in RGB
+                if (nChan == 3) // Image is in RGB
                 {
                     for (y = 1; y < height - 1; y++)
                     {
@@ -1447,92 +1438,81 @@ namespace SS_OpenCV
 
                         for (x = 1; x < width - 1; x++)
                         {
-                            byte* dataPtrAux = rowDataPtr + (x - 1) * nChan;
+                            // Precompute the pointers to the neighboring pixels
+                            byte* pA = rowDataPtr + (x - 1) * nChan;  // a
+                            byte* pB = pA + nChan;                    // b
+                            byte* pC = pB + nChan;                    // c
+                            byte* pD = pA + widthStep;                // d
+                            byte* pF = pC + widthStep;                // f
+                            byte* pG = pD + widthStep;                // g
+                            byte* pH = pG + nChan;                    // h
+                            byte* pI = pH + nChan;                    // i
 
+                            // Vertical Sobel filter: -1a - 2d - 1g + 1c + 2f + 1i
+                            // Horizontal Sobel filter: -1a - 2b - 1c + 1g + 2h + 1i
 
-                            // Vertical: -1a - 2d - 1g + 1c +2f + 1i
-                            // Horizontal: -1a - 2b - 1c + 1g + 2h + 1i
+                            // Start computing vertical and horizontal gradients
+                            verticalSumB = horizontalSumB = -pA[0];  // -1a
+                            verticalSumG = horizontalSumG = -pA[1];
+                            verticalSumR = horizontalSumR = -pA[2];
 
-                            //-1a
-                            verticalSumB = horizontalSumB = -dataPtrAux[0];
-                            verticalSumG = horizontalSumG = -dataPtrAux[1];
-                            verticalSumR = horizontalSumR = -dataPtrAux[2];
+                            horizontalSumB += -2 * pB[0];             // -2b
+                            horizontalSumG += -2 * pB[1];
+                            horizontalSumR += -2 * pB[2];
 
-                            dataPtrAux += nChan;
+                            horizontalSumB += -pC[0];                 // -1c
+                            horizontalSumG += -pC[1];
+                            horizontalSumR += -pC[2];
 
-                            //-2b
-                            horizontalSumB += -2 * dataPtrAux[0];
-                            horizontalSumG += -2 * dataPtrAux[1];
-                            horizontalSumR += -2 * dataPtrAux[2];
+                            verticalSumB += pC[0];                    // +1c
+                            verticalSumG += pC[1];
+                            verticalSumR += pC[2];
 
-                            dataPtrAux += nChan;
+                            verticalSumB += -2 * pD[0];               // -2d
+                            verticalSumG += -2 * pD[1];
+                            verticalSumR += -2 * pD[2];
 
-                            //-1c
-                            horizontalSumB += -dataPtrAux[0];
-                            horizontalSumG += -dataPtrAux[1];
-                            horizontalSumR += -dataPtrAux[2];
+                            verticalSumB += 2 * pF[0];                // +2f
+                            verticalSumG += 2 * pF[1];
+                            verticalSumR += 2 * pF[2];
 
-                            //1c
-                            verticalSumB += dataPtrAux[0];
-                            verticalSumG += dataPtrAux[1];
-                            verticalSumR += dataPtrAux[2];
+                            horizontalSumB += pG[0];                  // +1g
+                            horizontalSumG += pG[1];
+                            horizontalSumR += pG[2];
 
-                            dataPtrAux += filterLineAdvance;
+                            verticalSumB += -pG[0];                   // -1g
+                            verticalSumG += -pG[1];
+                            verticalSumR += -pG[2];
 
-                            //-2d
-                            verticalSumB += -2 * dataPtrAux[0];
-                            verticalSumG += -2 * dataPtrAux[1];
-                            verticalSumR += -2 * dataPtrAux[2];
+                            horizontalSumB += 2 * pH[0];              // +2h
+                            horizontalSumG += 2 * pH[1];
+                            horizontalSumR += 2 * pH[2];
 
-                            dataPtrAux += 2 * nChan;
+                            horizontalSumB += pI[0];                  // +1i
+                            horizontalSumG += pI[1];
+                            horizontalSumR += pI[2];
 
-                            //2f
-                            verticalSumB += 2 * dataPtrAux[0];
-                            verticalSumG += 2 * dataPtrAux[1];
-                            verticalSumR += 2 * dataPtrAux[2];
+                            verticalSumB += pI[0];                    // +1i
+                            verticalSumG += pI[1];
+                            verticalSumR += pI[2];
 
-                            dataPtrAux += filterLineAdvance;
-
-                            //1g
-                            horizontalSumB += dataPtrAux[0];
-                            horizontalSumG += dataPtrAux[1];
-                            horizontalSumR += dataPtrAux[2];
-
-                            //-1g
-                            verticalSumB += -dataPtrAux[0];
-                            verticalSumG += -dataPtrAux[1];
-                            verticalSumR += -dataPtrAux[2];
-
-                            dataPtrAux += nChan;
-
-                            //2h
-                            horizontalSumB += 2 * dataPtrAux[0];
-                            horizontalSumG += 2 * dataPtrAux[1];
-                            horizontalSumR += 2 * dataPtrAux[2];
-
-                            dataPtrAux += nChan;
-
-                            //1i
-                            horizontalSumB += dataPtrAux[0];
-                            horizontalSumG += dataPtrAux[1];
-                            horizontalSumR += dataPtrAux[2];
-
-                            verticalSumB += dataPtrAux[0];
-                            verticalSumG += dataPtrAux[1];
-                            verticalSumR += dataPtrAux[2];
-
-
+                            // Compute the final Sobel magnitude for each channel and clamp to [0, 255]
                             dataPtr[0] = (byte)Clamp(Math.Abs(horizontalSumB) + Math.Abs(verticalSumB), 0, 255);
                             dataPtr[1] = (byte)Clamp(Math.Abs(horizontalSumG) + Math.Abs(verticalSumG), 0, 255);
                             dataPtr[2] = (byte)Clamp(Math.Abs(horizontalSumR) + Math.Abs(verticalSumR), 0, 255);
 
+                            // Move to the next pixel in the row
                             dataPtr += nChan;
                         }
+
+                        // Skip any padding between rows in the original image
                         dataPtr += padding;
                     }
                 }
             }
         }
+
+
 
         public static void Diferentiation(Image<Bgr, byte> img, Image<Bgr, byte> imgCopy)
         {
