@@ -1712,6 +1712,211 @@ namespace SS_OpenCV
             }
         }
 
+        public static void MedianBlur(Image<Bgr, byte> img, Image<Bgr, byte> imgCopy, int kernelSize)
+        {
+            CvInvoke.MedianBlur(imgCopy, img, kernelSize);
+        }
+
+        /// <summary>
+        /// Eval function
+        /// </summary>
+        /// <param name="img"></param>
+        /// <param name="imgCopy"></param>
+        public static void Median(Image<Bgr, byte> img, Image<Bgr, byte> imgCopy)
+        {
+            MedianBlur(img, imgCopy, 3);
+        }
+
+        
+        public static void MedianBlur3D(Image<Bgr, byte> img, Image<Bgr, byte> imgCopy, int dim)
+        {
+            unsafe
+            {
+                MIplImage m = img.MIplImage;
+                byte* dataPtr = (byte*)m.ImageData.ToPointer(); // Pointer to the image
+
+                int halfDim = dim / 2;
+                int minusHalfDim = -halfDim;
+
+                // Pad the copy image using OpenCV
+                Image<Bgr, byte> imgCopyPadded = new Image<Bgr, byte>(img.Width + halfDim * 2, img.Height + halfDim * 2);
+                CvInvoke.CopyMakeBorder(img, imgCopyPadded, halfDim, halfDim, halfDim, halfDim, Emgu.CV.CvEnum.BorderType.Replicate);
+                MIplImage mCopy = imgCopyPadded.MIplImage;
+                byte* dataPtrCopy = (byte*)mCopy.ImageData.ToPointer(); // Pointer to the padded image
+
+                int width = imgCopyPadded.Width;
+                int height = imgCopyPadded.Height;
+                int nChan = m.NChannels; // number of channels - 3 (RGB)
+                int padding = m.WidthStep - m.NChannels * m.Width; // alignment bytes (padding)
+                int widthStep = mCopy.WidthStep;
+                int filterLineAdvance = widthStep - dim * nChan;
+
+                if (nChan == 3) // image in RGB
+                {
+                    for (int y = halfDim; y < height - halfDim; y++)
+                    {
+                        for (int x = halfDim; x < width - halfDim; x++)
+                        {
+                            double minDistance = double.MaxValue;
+                            ((int, int), double) bestDistance = ((0, 0), 0);
+
+                            // Iterate over the kernel, comparing the pixel with every other pixel
+                            for (int i = minusHalfDim; i <= halfDim; i++)
+                            {
+                                for (int j = minusHalfDim; j <= halfDim; j++)
+                                {
+                                    int currentY = y + i;
+                                    int currentX = x + j;
+                                    double totalDistance = 0;
+
+                                    byte* dataPtrAux = dataPtrCopy + currentY * widthStep + currentX * nChan;
+
+                                    // Compare this pixel with every other pixel in the kernel
+                                    for (int k = minusHalfDim; k <= halfDim; k++)
+                                    {
+                                        for (int l = minusHalfDim; l <= halfDim; l++)
+                                        {
+                                            if (i == k && j == l)
+                                                continue; // skip self-comparison
+
+                                            byte* comparisonPtr = dataPtrCopy + (y + k) * widthStep + (x + l) * nChan;
+                                            
+                                            totalDistance += Math.Abs(dataPtrAux[0] - comparisonPtr[0])
+                                                           + Math.Abs(dataPtrAux[1] - comparisonPtr[1])
+                                                           + Math.Abs(dataPtrAux[2] - comparisonPtr[2]);
+                                        }
+                                    }
+                                    // 
+                                    // Check if the current pixel has the minimum sum of distances
+                                    if (totalDistance < minDistance)
+                                    {
+                                        minDistance = totalDistance;
+                                        bestDistance = ((currentY, currentX), minDistance);
+                                    }
+                                }
+                            }
+
+                            // Set the output pixel to the color of the pixel with the minimum distance
+                            byte* bestPixelPtr = dataPtrCopy + bestDistance.Item1.Item1 * widthStep + bestDistance.Item1.Item2 * nChan;
+                            dataPtr[0] = bestPixelPtr[0];
+                            dataPtr[1] = bestPixelPtr[1];
+                            dataPtr[2] = bestPixelPtr[2];
+
+                            dataPtr += nChan; // move to the next pixel
+                        }
+                        dataPtr += padding; // move to the next row
+                    }
+                }
+            }
+        }
+
+
+        /// <summary>
+        /// Eval function
+        /// </summary>
+        /// <param name="img"></param>
+        /// <param name="imgCopy"></param>
+        public static void Median3D(Image<Bgr, byte> img, Image<Bgr, byte> imgCopy)
+        {
+            MedianBlur3D(img, imgCopy, 3);
+        }
+
+
+        public static int[] Histogram_Gray(Image<Bgr, byte> img)
+        {
+            int[] histogram = new int[256];
+            unsafe
+            {
+                MIplImage m = img.MIplImage;
+                byte* dataPtr = (byte*)m.ImageData.ToPointer();
+                int width = img.Width;
+                int height = img.Height;
+                int nChan = m.NChannels;
+                int padding = m.WidthStep - m.NChannels * m.Width;
+                int widthStep = m.WidthStep;
+                int x, y;
+
+                if (nChan == 3)
+                {
+                    for (y = 0; y < height; y++)
+                    {
+                        for (x = 0; x < width; x++)
+                        {
+                            histogram[(int)Math.Round((dataPtr[0] + dataPtr[1] + dataPtr[2]) / 3.0)]++;
+                            dataPtr += nChan;
+                        }
+                        dataPtr += padding;
+                    }
+                }
+            }
+            return histogram;
+        }
+
+        public static int[,] Histogram_RGB(Image<Bgr, byte> img)
+        {
+            int[,] histogram = new int[3, 256];
+            unsafe
+            {
+                MIplImage m = img.MIplImage;
+                byte* dataPtr = (byte*)m.ImageData.ToPointer();
+                int width = img.Width;
+                int height = img.Height;
+                int nChan = m.NChannels;
+                int padding = m.WidthStep - m.NChannels * m.Width;
+                int widthStep = m.WidthStep;
+                int x, y;
+
+                if (nChan == 3)
+                {
+                    for (y = 0; y < height; y++)
+                    {
+                        for (x = 0; x < width; x++)
+                        {
+                            histogram[0, dataPtr[0]]++; // Blue
+                            histogram[1, dataPtr[1]]++; // Green
+                            histogram[2, dataPtr[2]]++; // Red
+                            dataPtr += nChan;
+                        }
+                        dataPtr += padding;
+                    }
+                }
+            }
+            return histogram;
+        }
+
+        public static int[,] Histogram_All(Image<Bgr, byte> img)
+        {
+            int[,] histogram = new int[4, 256];
+            unsafe
+            {
+                MIplImage m = img.MIplImage;
+                byte* dataPtr = (byte*)m.ImageData.ToPointer();
+                int width = img.Width;
+                int height = img.Height;
+                int nChan = m.NChannels;
+                int padding = m.WidthStep - m.NChannels * m.Width;
+                int widthStep = m.WidthStep;
+                int x, y;
+
+                if (nChan == 3)
+                {
+                    for (y = 0; y < height; y++)
+                    {
+                        for (x = 0; x < width; x++)
+                        {
+                            histogram[0, (int)Math.Round((dataPtr[0] + dataPtr[1] + dataPtr[2]) / 3.0)]++; // Gray
+                            histogram[1, dataPtr[0]]++; // Blue
+                            histogram[2, dataPtr[1]]++; // Green
+                            histogram[3, dataPtr[2]]++; // Red
+                            dataPtr += nChan;
+                        }
+                        dataPtr += padding;
+                    }
+                }
+            }
+            return histogram;
+        }
+
 
         private static bool IsMatrixSeparable(float[,] matrix, out float[] u, out float[] v)
         {
@@ -1886,6 +2091,15 @@ namespace SS_OpenCV
                     }
                 }
             }
+        }
+    }
+
+    class DistanceComparer : IComparer<((int, int), double)>
+    {
+        // The best distance is the one with the smallest value
+        public int Compare(((int, int), double) x, ((int, int), double) y)
+        {
+            return x.Item2.CompareTo(y.Item2);
         }
     }
 }
