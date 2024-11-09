@@ -15,6 +15,7 @@ using Emgu.CV.Cuda;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.ProgressBar;
+using System.Runtime.CompilerServices;
 
 namespace SS_OpenCV
 {
@@ -599,47 +600,59 @@ namespace SS_OpenCV
                 int nChan = m.NChannels; // number of channels - 3
                 int padding = m.WidthStep - m.NChannels * m.Width; // alingnment bytes (padding)
                 int widthStep = m.WidthStep;
-                int xDestin, yDestin, xOrigin, yOrigin;
+                int xDestin, yDestin;
+                float xOrigin, yOrigin; // values obtained after getting the original pixel position directly before interpolation
+                float deltaX, deltaY;
+                byte[][] neighbors = new byte[][] {
+                    new byte[nChan],
+                    new byte[nChan],
+                    new byte[nChan],
+                    new byte[nChan]
+                }; // 4 RGB neighbors (xOrigin, yOrigin) (xOrigin + 1, yOrigin) (xOrigin, yOrigin + 1) (xOrigin + 1, yOrigin + 1)
 
                 float inverseScaleFactor = 1 / scaleFactor;
 
-
-                if (nChan == 3) // image in RGB
+                
+                for (yDestin = 0; yDestin < height; yDestin++)
                 {
-                    for (yDestin = 0; yDestin < height; yDestin++)
+                    // Check if the yOrigin is valid
+                    yOrigin = yDestin * inverseScaleFactor;
+                    bool yOriginValid = yOrigin >= 0 && yOrigin < height;
+                    deltaY = yOrigin - (int)yOrigin;
+
+                    for (xDestin = 0; xDestin < width; xDestin++)
                     {
-                        yOrigin = (int)Math.Round(yDestin * inverseScaleFactor);
-                        bool yOriginValid = yOrigin >= 0 && yOrigin < height;
-                        byte* rowPtrOrigin = dataPtrCopy + yOrigin * widthStep;
+                        xOrigin = xDestin * inverseScaleFactor;
 
-                        for (xDestin = 0; xDestin < width; xDestin++)
+                        
+                        if (!yOriginValid || xOrigin < 0 || xOrigin >= width)
                         {
-                            xOrigin = (int)Math.Round(xDestin * inverseScaleFactor);
-
-                            if (!yOriginValid || xOrigin < 0 || xOrigin >= width)
-                            {
-                                dataPtr[0] = 0;
-                                dataPtr[1] = 0;
-                                dataPtr[2] = 0;
-
-                            }
-                            else
-                            {
-                                byte* dataPtrAux = rowPtrOrigin + xOrigin * nChan;
-                                dataPtr[0] = dataPtrAux[0];
-                                dataPtr[1] = dataPtrAux[1];
-                                dataPtr[2] = dataPtrAux[2];
-                            }
-
-                            dataPtr += nChan;
+                            dataPtr[0] = dataPtr[1] = dataPtr[2] = 0;
 
                         }
+                        else // bilinear interpolation
+                        {
+                            deltaX = xOrigin - (int)xOrigin;
 
-                        //at the end of the line advance the pointer by the alignment bytes (padding)
-                        dataPtr += padding;
+                            GetNeighboringPixels(dataPtrCopy, widthStep, nChan, xOrigin, yOrigin, neighbors);
+
+                            for (int i = 0; i < nChan; i++)
+                            {
+                                double aY = LinearInterpolation(neighbors[0][i], neighbors[1][i], deltaX);
+                                double bY = LinearInterpolation(neighbors[2][i], neighbors[3][i], deltaX);
+                                dataPtr[i] = (byte)Math.Round(LinearInterpolation(aY, bY, deltaY));
+                            }
+                        }
+
+                        dataPtr += nChan;
+
                     }
+
+                    //at the end of the line advance the pointer by the alignment bytes (padding)
+                    dataPtr += padding;
                 }
             }
+            
         }
 
         public static void Scale_point_xy_Bilinear(Image<Bgr, byte> img, Image<Bgr, byte> imgCopy, float scaleFactor, int centerX, int centerY)
@@ -1917,6 +1930,133 @@ namespace SS_OpenCV
             return histogram;
         }
 
+        // TODO: Implement the histogram equalization function
+        public static void Equalization(Image<Bgr, byte> img)
+        {
+            unsafe
+            {             
+                MIplImage m = img.MIplImage;
+
+                int width = img.Width;
+                int height = img.Height;
+                int nChan = m.NChannels;
+                int padding = m.WidthStep - m.NChannels * m.Width;
+                int widthStep = m.WidthStep;
+                int x, y;
+
+                // If the image is in RGB
+                if (nChan == 3)
+                {
+                    // Convert image to YCbCr
+                    Image<Ycc, byte> imgYcc = img.Convert<Ycc, byte>();
+                    m = imgYcc.MIplImage;
+                    byte* dataPtr = (byte*)m.ImageData.ToPointer();
+
+                    // Equalize the Y
+                    int[] histogram = Histogram_Gray(img);
+                    int[] cumulativeHistogram = new int[256];
+                    cumulativeHistogram[0] = histogram[0];
+                    for (int i = 1; i < 256; i++)
+                    {
+                        cumulativeHistogram[i] = cumulativeHistogram[i - 1] + histogram[i];
+                    }
+
+                    for (y = 0; y < height; y++)
+                    {
+                        for (x = 0; x < width; x++)
+                        {
+                            dataPtr[0] = (byte)(cumulativeHistogram[dataPtr[0]] * 255 / (width * height));
+                            dataPtr += nChan;
+                        }
+                        dataPtr += padding;
+                    }
+
+                    // Convert back to RGB
+                    imgYcc.Convert<Bgr, byte>().CopyTo(img);
+
+                }  
+            }
+        }
+
+        public static void ConvertToBW(Image<Bgr, byte> img, int threshold)
+        {
+            unsafe
+            {
+                MIplImage m = img.MIplImage;
+                byte* dataPtr = (byte*)m.ImageData.ToPointer();
+                byte binary; // binary value of the pixel
+
+                int width = img.Width;
+                int height = img.Height;
+                int nChan = m.NChannels;
+                int padding = m.WidthStep - m.NChannels * m.Width;
+                int widthStep = m.WidthStep;
+                int x, y;
+
+                if (nChan == 3) // image in RGB
+                {
+                    for (y = 0; y < height; y++)
+                    {
+                        for (x = 0; x < width; x++)
+                        {
+                            // convert to gray
+                            binary = Math.Round((dataPtr[0] + dataPtr[1] + dataPtr[2]) / 3.0) > threshold ? (byte) 255 : (byte) 0;
+
+                            // store in the image
+                            dataPtr[0] = binary;
+                            dataPtr[1] = binary;
+                            dataPtr[2] = binary;
+
+                            // advance the pointer to the next pixel
+                            dataPtr += nChan;
+                        }
+
+                        //at the end of the line advance the pointer by the alignment bytes (padding)
+                        dataPtr += padding;
+                    }
+                }
+            }  
+        }
+
+        public static void ConvertToBW_Otsu(Image<Bgr, byte> img)
+        {
+            int[] grayHistogram = Histogram_Gray(img);
+            int totalPixels = img.Width * img.Height;
+
+            float sum = 0;
+            for (int i = 0; i < 256; i++) sum += i * grayHistogram[i];
+
+            float sumB = 0, wB = 0, wF;
+            float maxVariance = 0;
+            int threshold = 0;
+
+            for (int t = 0; t < 256; t++)
+            {
+                wB += grayHistogram[t]; // Background weight
+                if (wB == 0) continue;
+                wF = totalPixels - wB; // Foreground weight
+                if (wF == 0) break;
+
+                sumB += t * grayHistogram[t];
+                float mB = sumB / wB; // Background mean
+                float mF = (sum - sumB) / wF; // Foreground mean
+
+                // Between-class variance
+                float variance = wB * wF * (mB - mF) * (mB - mF);
+
+                // Check if new maximum found
+                if (variance > maxVariance)
+                {
+                    maxVariance = variance;
+                    threshold = t;
+                }
+            }
+            
+            ConvertToBW(img, threshold);
+        }
+
+
+
 
         private static bool IsMatrixSeparable(float[,] matrix, out float[] u, out float[] v)
         {
@@ -1965,6 +2105,32 @@ namespace SS_OpenCV
         private static double Clamp(double value, double min, double max)
         {
             return Math.Max(min, Math.Min(value, max));
+        }
+
+        private static unsafe void GetNeighboringPixels(byte* dataPtrCopy, int widthStep, int nChan, float xOrigin, float yOrigin, byte[][] neighbors)
+        {
+            int xOriginInt = (int)xOrigin;
+            int yOriginInt = (int)yOrigin;
+
+            // directly populate neighbors array without creating new arrays every call
+            byte* neighbor1Ptr = dataPtrCopy + xOriginInt * nChan + yOriginInt * widthStep;
+            byte* neighbor2Ptr = neighbor1Ptr + nChan;
+            byte* neighbor3Ptr = neighbor1Ptr + widthStep;
+            byte* neighbor4Ptr = neighbor3Ptr + nChan;
+
+            for (int i = 0; i < nChan; i++)
+            {
+                neighbors[0][i] = neighbor1Ptr[i];
+                neighbors[1][i] = neighbor2Ptr[i];
+                neighbors[2][i] = neighbor3Ptr[i];
+                neighbors[3][i] = neighbor4Ptr[i];
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static double LinearInterpolation(double a, double b, double delta)
+        {
+            return a + (b-a) * delta;
         }
 
         public static void MeanSolutionAPadding(Image<Bgr, byte> img, int dim)
@@ -2091,15 +2257,6 @@ namespace SS_OpenCV
                     }
                 }
             }
-        }
-    }
-
-    class DistanceComparer : IComparer<((int, int), double)>
-    {
-        // The best distance is the one with the smallest value
-        public int Compare(((int, int), double) x, ((int, int), double) y)
-        {
-            return x.Item2.CompareTo(y.Item2);
         }
     }
 }
