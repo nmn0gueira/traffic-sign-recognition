@@ -1,21 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using Emgu.CV.Structure;
 using Emgu.CV;
 using System.Drawing;
-using System.Management.Instrumentation;
-using System.Windows.Forms;
-using Emgu.CV.ImgHash;
-using System.Linq;
-using Emgu.CV.XFeatures2D;
-using System.Diagnostics.Eventing.Reader;
-using System.Diagnostics.Contracts;
-using Emgu.CV.Cuda;
-using System.Drawing.Drawing2D;
-using System.Runtime.InteropServices;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.ProgressBar;
 using System.Runtime.CompilerServices;
+using ResultsDLL;
 
 namespace SS_OpenCV
 {
@@ -540,46 +528,60 @@ namespace SS_OpenCV
                 int nChan = m.NChannels; // number of channels - 3
                 int padding = m.WidthStep - m.NChannels * m.Width; // alingnment bytes (padding)
                 int widthStep = m.WidthStep;
-                int xDestin, yDestin, xOrigin, yOrigin;
+                int xDestin, yDestin;
+                double xOrigin, yOrigin; // values obtained after getting the original pixel position directly before interpolation
+                double deltaX, deltaY;
+                byte[][] neighbors = new byte[][] {
+                    new byte[nChan],
+                    new byte[nChan],
+                    new byte[nChan],
+                    new byte[nChan]
+                }; // 4 RGB neighbors (xOrigin, yOrigin) (xOrigin + 1, yOrigin) (xOrigin, yOrigin + 1) (xOrigin + 1, yOrigin + 1)
 
-                float halfHeight = height / 2.0f;
-                float halfWidth = width / 2.0f;
+                double halfHeight = height / 2.0;
+                double halfWidth = width / 2.0;
 
                 double cos = Math.Cos(angle);
                 double sin = Math.Sin(angle);
 
-                if (nChan == 3) // image in RGB
+                
+                
+                for (yDestin = 0; yDestin < height; yDestin++)
                 {
-                    for (yDestin = 0; yDestin < height; yDestin++)
+                    double aux1 = (halfHeight - yDestin) * sin - halfWidth;
+                    double aux2 = (halfHeight - yDestin) * cos;
+
+                    for (xDestin = 0; xDestin < width; xDestin++)
                     {
-                        double aux1 = (halfHeight - yDestin) * sin - halfWidth;
-                        double aux2 = (halfHeight - yDestin) * cos;
+                        xOrigin = (xDestin - halfWidth) * cos - aux1;
+                        yOrigin = halfHeight - (xDestin - halfWidth) * sin - aux2;
+                            
 
-                        for (xDestin = 0; xDestin < width; xDestin++)
+                        if (xOrigin < 0 || xOrigin >= width || yOrigin < 0 || yOrigin >= height)
                         {
-                            xOrigin = (int)Math.Round((xDestin - halfWidth) * cos - aux1);
-                            yOrigin = (int)Math.Round(halfHeight - (xDestin - halfWidth) * sin - aux2);
-
-                            if (xOrigin < 0 || xOrigin >= width || yOrigin < 0 || yOrigin >= height)
-                            {
-                                dataPtr[0] = 0;
-                                dataPtr[1] = 0;
-                                dataPtr[2] = 0;
-                            }
-
-                            else
-                            {
-                                byte* dataPtrAux = dataPtrCopy + yOrigin * widthStep + xOrigin * nChan;
-                                dataPtr[0] = dataPtrAux[0];
-                                dataPtr[1] = dataPtrAux[1];
-                                dataPtr[2] = dataPtrAux[2];
-                            }
-
-                            dataPtr += nChan;
+                            dataPtr[0] = dataPtr[1] = dataPtr[2] = 0;
                         }
-                        dataPtr += padding;
+
+                        else
+                        {
+                            deltaX = xOrigin - (int)xOrigin;
+                            deltaY = yOrigin - (int)yOrigin;
+
+                            GetNeighboringPixels(dataPtrCopy, widthStep, nChan, xOrigin, yOrigin, neighbors);
+
+                            for (int i = 0; i < nChan; i++)
+                            {
+                                double aY = LinearInterpolation(neighbors[0][i], neighbors[1][i], deltaX);
+                                double bY = LinearInterpolation(neighbors[2][i], neighbors[3][i], deltaX);
+                                dataPtr[i] = (byte)Math.Round(LinearInterpolation(aY, bY, deltaY));
+                            }
+                        }
+
+                        dataPtr += nChan;
                     }
+                    dataPtr += padding;
                 }
+                
             }
         }
 
@@ -601,8 +603,8 @@ namespace SS_OpenCV
                 int padding = m.WidthStep - m.NChannels * m.Width; // alingnment bytes (padding)
                 int widthStep = m.WidthStep;
                 int xDestin, yDestin;
-                float xOrigin, yOrigin; // values obtained after getting the original pixel position directly before interpolation
-                float deltaX, deltaY;
+                double xOrigin, yOrigin; // values obtained after getting the original pixel position directly before interpolation
+                double deltaX, deltaY;
                 byte[][] neighbors = new byte[][] {
                     new byte[nChan],
                     new byte[nChan],
@@ -673,7 +675,15 @@ namespace SS_OpenCV
                 int nChan = m.NChannels; // number of channels - 3
                 int padding = m.WidthStep - m.NChannels * m.Width; // alingnment bytes (padding)
                 int widthStep = m.WidthStep;
-                int xDestin, yDestin, xOrigin, yOrigin;
+                int xDestin, yDestin;
+                double xOrigin, yOrigin; // values obtained after getting the original pixel position directly before interpolation
+                double deltaX, deltaY;
+                byte[][] neighbors = new byte[][] {
+                    new byte[nChan],
+                    new byte[nChan],
+                    new byte[nChan],
+                    new byte[nChan]
+                }; // 4 RGB neighbors (xOrigin, yOrigin) (xOrigin + 1, yOrigin) (xOrigin, yOrigin + 1) (xOrigin + 1, yOrigin + 1)
 
 
                 float xOffset = centerX - (width - 1) / 2.0f / scaleFactor;
@@ -682,58 +692,71 @@ namespace SS_OpenCV
                 float inverseScaleFactor = 1 / scaleFactor;
 
 
-                if (nChan == 3) // image in RGB
+                
+                for (yDestin = 0; yDestin < height; yDestin++)
                 {
-                    for (yDestin = 0; yDestin < height; yDestin++)
+                    yOrigin = yDestin * inverseScaleFactor + yOffset;
+                    bool yOriginValid = yOrigin >= 0 && yOrigin < height;
+                    deltaY = yOrigin - (int)yOrigin;
+
+                    for (xDestin = 0; xDestin < width; xDestin++)
                     {
-                        yOrigin = (int)Math.Round(yDestin * inverseScaleFactor + yOffset);
-                        bool yOriginValid = yOrigin >= 0 && yOrigin < height;
-                        byte* rowPtrOrigin = dataPtrCopy + yOrigin * widthStep;
+                        xOrigin = xDestin * inverseScaleFactor + xOffset;
+                            
 
-                        for (xDestin = 0; xDestin < width; xDestin++)
+                        if (!yOriginValid || xOrigin < 0 || xOrigin >= width)
                         {
-                            xOrigin = (int)Math.Round(xDestin * inverseScaleFactor + xOffset);
-
-
-                            if (!yOriginValid || xOrigin < 0 || xOrigin >= width)
-                            {
-                                dataPtr[0] = 0;
-                                dataPtr[1] = 0;
-                                dataPtr[2] = 0;
-
-                            }
-                            else
-                            {
-                                byte* dataPtrAux = rowPtrOrigin + xOrigin * nChan;
-                                dataPtr[0] = dataPtrAux[0];
-                                dataPtr[1] = dataPtrAux[1];
-                                dataPtr[2] = dataPtrAux[2];
-                            }
-
-                            dataPtr += nChan;
+                            dataPtr[0] = dataPtr[1] = dataPtr[2] = 0;
 
                         }
+                        else
+                        {
+                            deltaX = xOrigin - (int)xOrigin;
 
-                        //at the end of the line advance the pointer by the alignment bytes (padding)
-                        dataPtr += padding;
+                            GetNeighboringPixels(dataPtrCopy, widthStep, nChan, xOrigin, yOrigin, neighbors);
+
+                            for (int i = 0; i < nChan; i++)
+                            {
+                                double aY = LinearInterpolation(neighbors[0][i], neighbors[1][i], deltaX);
+                                double bY = LinearInterpolation(neighbors[2][i], neighbors[3][i], deltaX);
+                                dataPtr[i] = (byte)Math.Round(LinearInterpolation(aY, bY, deltaY));
+                            }
+                        }
+
+                        dataPtr += nChan;
                     }
+                    //at the end of the line advance the pointer by the alignment bytes (padding)
+                    dataPtr += padding;
                 }
+                
             }
         }
 
         public static void Mean(Image<Bgr, byte> img, Image<Bgr, byte> imgCopy)
         {
-            Mean_solutionA(img, imgCopy, 3);
-            //MeanSolutionAPadding(img, 3);
+            MeanQuadratic(img, imgCopy, 3);
+            //MeanSolutionAPadding(img, 15);
         }
 
+        public static void Mean_solutionB(Image<Bgr, byte> img, Image<Bgr, byte> imgCopy)
+        {
+            MeanLinear(img, 3);
+        }
+
+        public static void Mean_solutionC(Image<Bgr, byte> img, Image<Bgr, byte> imgCopy, int size)
+        {
+            MeanConstant(img, size);
+        }
+
+
+
         /// <summary>
-        /// Applies a mean filter to an image with special treatment of the borders
+        /// Applies a mean filter to an image with quadratic time complexity by applying special treatment of the borders
         /// </summary>
         /// <param name="img"></param>
         /// <param name="imgCopy"></param>
         /// <param name="dim"></param>
-        public static void Mean_solutionA(Image<Bgr, byte> img, Image<Bgr, byte> imgCopy, int dim)
+        public static void MeanQuadratic(Image<Bgr, byte> img, Image<Bgr, byte> imgCopy, int dim)
         {
             unsafe
             {
@@ -963,7 +986,12 @@ namespace SS_OpenCV
             }
         }
 
-        public static void Mean_solutionB(Image<Bgr, byte> img, int dim)
+        /// <summary>
+        /// Applies a mean filter to an image with linear time complexity
+        /// </summary>
+        /// <param name="img"></param>
+        /// <param name="dim"></param>
+        public static void MeanLinear(Image<Bgr, byte> img, int dim)
         {
             unsafe
             {
@@ -987,45 +1015,149 @@ namespace SS_OpenCV
                 int widthStep = mCopy.WidthStep;
                 int filterLineAdvance = widthStep - dim * nChan;
                 int x, y;
-                int sumR, sumG, sumB;
+                int sumR = 0, sumG = 0, sumB = 0;
+                int sumToRemoveR = 0, sumToRemoveG = 0, sumToRemoveB = 0;
 
-                if (nChan == 3) // image in RGB
+                int[] intermediateBuffer = new int[img.Width * img.Height * nChan];
+                int* intermediateBufferPtr = (int*)Unsafe.AsPointer(ref intermediateBuffer[0]);
+                int* intermediateBufferAux = intermediateBufferPtr;
+                int bufferWidthStep = img.Width * nChan;
+
+
+                byte* dataPtrAux = dataPtrCopy;
+                // First pixel calculation (top-left corner)
+                for (int i = minusHalfDim; i <= halfDim; i++)
                 {
-                    for (y = halfDim; y < height - halfDim; y++)
+                    for (int j = minusHalfDim; j <= halfDim; j++)
                     {
-                        for (x = halfDim; x < width - halfDim; x++)
+                        sumB += dataPtrAux[0];
+                        sumG += dataPtrAux[1];
+                        sumR += dataPtrAux[2];
+
+                        dataPtrAux += nChan;
+                    }
+
+                    dataPtrAux += filterLineAdvance;
+                }
+
+                intermediateBufferAux[0] = sumB;
+                intermediateBufferAux[1] = sumG;
+                intermediateBufferAux[2] = sumR;
+
+                intermediateBufferAux += nChan;
+
+                // First line (Sliding window sum: Iterate over the image horizontally)
+                for (x = halfDim + 1; x < width - halfDim; x++)
+                {
+                    sumToRemoveB = sumToRemoveG = sumToRemoveR = 0;
+
+                    dataPtrAux = dataPtrCopy + (x - halfDim - 1) * nChan;
+
+                    // Remove left column
+                    for (int i = 0; i < dim; i++)
+                    {
+                        sumToRemoveB += dataPtrAux[0];
+                        sumToRemoveG += dataPtrAux[1];
+                        sumToRemoveR += dataPtrAux[2];
+
+                        dataPtrAux += widthStep;
+                    }
+
+                    // Add right column
+                    dataPtrAux = dataPtrCopy + (x + halfDim) * nChan;
+                    for (int i = 0; i < dim; i++)
+                    {
+                        sumB += dataPtrAux[0];
+                        sumG += dataPtrAux[1];
+                        sumR += dataPtrAux[2];
+
+                        dataPtrAux += widthStep;
+                    }
+
+                    intermediateBufferAux[0] = sumB -= sumToRemoveB;
+                    intermediateBufferAux[1] = sumG -= sumToRemoveG;
+                    intermediateBufferAux[2] = sumR -= sumToRemoveR;
+
+                    intermediateBufferAux += nChan;
+                }
+                
+
+                // Rest of the image
+                for (x = halfDim; x < width - halfDim; x++)
+                {
+
+                    // Get previous line pixel sums
+                    intermediateBufferAux = intermediateBufferPtr + (x - halfDim) * nChan;
+                    sumB = intermediateBufferAux[0];
+                    sumG = intermediateBufferAux[1];
+                    sumR = intermediateBufferAux[2];
+
+                    // Advance pointer to the next line
+                    intermediateBufferAux += bufferWidthStep;
+
+                    for (y = halfDim + 1; y < height - halfDim; y++)
+                    {
+                        
+                        sumToRemoveB = sumToRemoveG = sumToRemoveR = 0;
+
+                        dataPtrAux = dataPtrCopy + (y - halfDim - 1) * widthStep + (x - halfDim) * nChan;
+
+                        // Remove top row
+                        for (int i = 0; i < dim; i++)
                         {
-                            sumB = 0;
-                            sumG = 0;
-                            sumR = 0;
-                            byte* dataPtrAux = dataPtrCopy + (y - halfDim) * widthStep + (x - halfDim) * nChan;
+                            sumToRemoveB += dataPtrAux[0];
+                            sumToRemoveG += dataPtrAux[1];
+                            sumToRemoveR += dataPtrAux[2];
 
-                            for (int i = minusHalfDim; i <= halfDim; i++)
-                            {
-                                for (int j = minusHalfDim; j <= halfDim; j++)
-                                {
-                                    sumB += dataPtrAux[0];
-                                    sumG += dataPtrAux[1];
-                                    sumR += dataPtrAux[2];
-                                    dataPtrAux += nChan;
-                                }
-
-                                dataPtrAux += filterLineAdvance;
-                            }
-
-                            dataPtr[0] = (byte)Math.Round(sumB / count);
-                            dataPtr[1] = (byte)Math.Round(sumG / count);
-                            dataPtr[2] = (byte)Math.Round(sumR / count);
-
-                            dataPtr += nChan;
+                            dataPtrAux += nChan;
                         }
-                        dataPtr += padding;
+
+                        dataPtrAux = dataPtrCopy + (y + halfDim) * widthStep + (x - halfDim) * nChan;
+
+                        // Add bottom row
+                        for (int i = 0; i < dim; i++)
+                        {
+                            sumB += dataPtrAux[0];
+                            sumG += dataPtrAux[1];
+                            sumR += dataPtrAux[2];
+
+                            dataPtrAux += nChan;
+                        }
+
+                        intermediateBufferAux[0] = sumB -= sumToRemoveB;
+                        intermediateBufferAux[1] = sumG -= sumToRemoveG;
+                        intermediateBufferAux[2] = sumR -= sumToRemoveR;
+
+                        intermediateBufferAux += bufferWidthStep;
+
                     }
                 }
+
+                // Copy the intermediate buffer to the original image dividing by the count
+                for (y = halfDim; y < height - halfDim; y++)
+                {
+                    for (x = halfDim; x < width - halfDim; x++)
+                    {
+                        dataPtr[0] = (byte)Math.Round(intermediateBufferPtr[0] / count);
+                        dataPtr[1] = (byte)Math.Round(intermediateBufferPtr[1] / count);
+                        dataPtr[2] = (byte)Math.Round(intermediateBufferPtr[2] / count);
+
+                        dataPtr += nChan;
+                        intermediateBufferPtr += nChan;
+                    }
+
+                    dataPtr += padding;
+                }
+
             }
         }
 
-        public static void Mean_solutionC(Image<Bgr, byte> img, int dim)
+        /// <summary>
+        /// Applies a mean filter to an image with constant time complexity
+        /// </summary>
+        /// <param name="img"></param>
+        /// <param name="dim"></param>
+        public static void MeanConstant(Image<Bgr, byte> img, int dim)
         {
             unsafe
             {
@@ -1049,43 +1181,167 @@ namespace SS_OpenCV
                 int widthStep = mCopy.WidthStep;
                 int filterLineAdvance = widthStep - dim * nChan;
                 int x, y;
-                int sumR, sumG, sumB;
+                int sumR = 0, sumG = 0, sumB = 0;
+                int sumToRemoveR = 0, sumToRemoveG = 0, sumToRemoveB = 0;
 
-                if (nChan == 3) // image in RGB
+                int[] intermediateBuffer = new int[img.Width * img.Height * nChan];
+                int* intermediateBufferPtr = (int*)Unsafe.AsPointer(ref intermediateBuffer[0]);
+                int* intermediateBufferAux = intermediateBufferPtr;
+                int bufferWidthStep = img.Width * nChan;
+
+
+                byte* dataPtrAux = dataPtrCopy;
+                // First pixel calculation (top-left corner)
+                for (int i = minusHalfDim; i <= halfDim; i++)
                 {
-                    for (y = halfDim; y < height - halfDim; y++)
+                    for (int j = minusHalfDim; j <= halfDim; j++)
                     {
-                        for (x = halfDim; x < width - halfDim; x++)
-                        {
-                            sumB = 0;
-                            sumG = 0;
-                            sumR = 0;
-                            byte* dataPtrAux = dataPtrCopy + (y - halfDim) * widthStep + (x - halfDim) * nChan;
+                        sumB += dataPtrAux[0];
+                        sumG += dataPtrAux[1];
+                        sumR += dataPtrAux[2];
 
-                            for (int i = minusHalfDim; i <= halfDim; i++)
-                            {
-                                for (int j = minusHalfDim; j <= halfDim; j++)
-                                {
-                                    sumB += dataPtrAux[0];
-                                    sumG += dataPtrAux[1];
-                                    sumR += dataPtrAux[2];
-                                    dataPtrAux += nChan;
-                                }
-
-                                dataPtrAux += filterLineAdvance;
-                            }
-
-                            dataPtr[0] = (byte)Math.Round(sumB / count);
-                            dataPtr[1] = (byte)Math.Round(sumG / count);
-                            dataPtr[2] = (byte)Math.Round(sumR / count);
-
-                            dataPtr += nChan;
-                        }
-                        dataPtr += padding;
+                        dataPtrAux += nChan;
                     }
+
+                    dataPtrAux += filterLineAdvance;
                 }
+
+                intermediateBufferAux[0] = sumB;
+                intermediateBufferAux[1] = sumG;
+                intermediateBufferAux[2] = sumR;
+
+                intermediateBufferAux += nChan;
+
+                // First line (Sliding window sum: Iterate over the image horizontally)
+                for (x = halfDim + 1; x < width - halfDim; x++)
+                {
+                    sumToRemoveB = sumToRemoveG = sumToRemoveR = 0;
+
+                    dataPtrAux = dataPtrCopy + (x - halfDim - 1) * nChan;
+
+                    // Remove left column
+                    for (int i = 0; i < dim; i++)
+                    {
+                        sumToRemoveB += dataPtrAux[0];
+                        sumToRemoveG += dataPtrAux[1];
+                        sumToRemoveR += dataPtrAux[2];
+
+                        dataPtrAux += widthStep;
+                    }
+
+                    // Add right column
+                    dataPtrAux = dataPtrCopy + (x + halfDim) * nChan;
+                    for (int i = 0; i < dim; i++)
+                    {
+                        sumB += dataPtrAux[0];
+                        sumG += dataPtrAux[1];
+                        sumR += dataPtrAux[2];
+
+                        dataPtrAux += widthStep;
+                    }
+
+                    intermediateBufferAux[0] = sumB -= sumToRemoveB;
+                    intermediateBufferAux[1] = sumG -= sumToRemoveG;
+                    intermediateBufferAux[2] = sumR -= sumToRemoveR;
+
+                    intermediateBufferAux += nChan;
+                }
+
+                // Go get the first pixel sum values
+                sumB = intermediateBufferPtr[0];
+                sumG = intermediateBufferPtr[1];
+                sumR = intermediateBufferPtr[2];
+
+                // First column (Sliding window sum: Iterate over the image vertically)
+                for (y = halfDim + 1; y < height - halfDim; y++)
+                {
+                    sumToRemoveB = sumToRemoveG = sumToRemoveR = 0;
+
+                    dataPtrAux = dataPtrCopy + (y - halfDim - 1) * widthStep;
+
+                    // Remove top row
+                    for (int i = 0; i < dim; i++)
+                    {
+                        sumToRemoveB += dataPtrAux[0];
+                        sumToRemoveG += dataPtrAux[1];
+                        sumToRemoveR += dataPtrAux[2];
+
+                        dataPtrAux += nChan;
+                    }
+
+                    // Add bottom row
+                    dataPtrAux = dataPtrCopy + (y + halfDim) * widthStep;
+                    for (int i = 0; i < dim; i++)
+                    {
+                        sumB += dataPtrAux[0];
+                        sumG += dataPtrAux[1];
+                        sumR += dataPtrAux[2];
+
+                        dataPtrAux += nChan;
+                    }
+
+                    intermediateBufferAux[0] = sumB -= sumToRemoveB;
+                    intermediateBufferAux[1] = sumG -= sumToRemoveG;
+                    intermediateBufferAux[2] = sumR -= sumToRemoveR;
+
+                    intermediateBufferAux += bufferWidthStep;
+                }
+
+                intermediateBufferAux = intermediateBufferPtr + bufferWidthStep + nChan; // Start at the second pixel of the second line
+
+                
+                // Core
+                for (y = halfDim + 1; y < height - halfDim; y++)
+                {
+                    byte* a = dataPtrCopy + (y - halfDim - 1) * widthStep;
+                    byte* b = dataPtrCopy + (y - halfDim - 1) * widthStep + dim * nChan;
+                    byte* c = dataPtrCopy + (y - halfDim - 1) * widthStep + dim * widthStep;
+                    byte* d = dataPtrCopy + (y - halfDim - 1) * widthStep + dim * widthStep + dim * nChan;
+
+                    int* A = intermediateBufferPtr + (y - halfDim - 1) * bufferWidthStep;
+                    int* B = intermediateBufferPtr + (y - halfDim - 1) * bufferWidthStep + nChan;
+                    int* C = intermediateBufferPtr + (y - halfDim - 1) * bufferWidthStep + bufferWidthStep;
+
+                    for (x = halfDim + 1; x < width - halfDim; x++)
+                    {
+                        intermediateBufferAux[0] = B[0] - A[0] + C[0] + a[0] - b[0] - c[0] + d[0];
+                        intermediateBufferAux[1] = B[1] - A[1] + C[1] + a[1] - b[1] - c[1] + d[1];
+                        intermediateBufferAux[2] = B[2] - A[2] + C[2] + a[2] - b[2] - c[2] + d[2];
+
+                        a += nChan;
+                        b += nChan;
+                        c += nChan;
+                        d += nChan;
+                        A += nChan;
+                        B += nChan;
+                        C += nChan;
+
+                        intermediateBufferAux += nChan;
+                    }
+
+                    intermediateBufferAux += nChan; // Skip first pixel of the next line
+
+                }
+
+                // Copy the intermediate buffer to the original image dividing by the count
+                for (y = halfDim; y < height - halfDim; y++)
+                {
+                    for (x = halfDim; x < width - halfDim; x++)
+                    {
+                        dataPtr[0] = (byte)Math.Round(intermediateBufferPtr[0] / count);
+                        dataPtr[1] = (byte)Math.Round(intermediateBufferPtr[1] / count);
+                        dataPtr[2] = (byte)Math.Round(intermediateBufferPtr[2] / count);
+
+                        dataPtr += nChan;
+                        intermediateBufferPtr += nChan;
+                    }
+
+                    dataPtr += padding;
+                }
+
             }
         }
+    
 
 
         public static void NonUniform(Image<Bgr, byte> img, Image<Bgr, byte> imgCopy, float[,] matrix, float matrixWeight, float offset)
@@ -1936,34 +2192,33 @@ namespace SS_OpenCV
             unsafe
             {             
                 MIplImage m = img.MIplImage;
+                byte* dataPtr = (byte*)m.ImageData.ToPointer();
 
                 int width = img.Width;
                 int height = img.Height;
                 int nChan = m.NChannels;
                 int padding = m.WidthStep - m.NChannels * m.Width;
                 int widthStep = m.WidthStep;
-                int x, y;
 
                 // If the image is in RGB
                 if (nChan == 3)
                 {
-                    // Convert image to YCbCr
-                    Image<Ycc, byte> imgYcc = img.Convert<Ycc, byte>();
-                    m = imgYcc.MIplImage;
-                    byte* dataPtr = (byte*)m.ImageData.ToPointer();
+                    ImageRGBtoYCbCr(m);  // Convert image to YCbCr
 
-                    // Equalize the Y
-                    int[] histogram = Histogram_Gray(img);
+                    // Get histogram on the YCbCr channels
+                    int[,] histogram = Histogram_RGB(img);
                     int[] cumulativeHistogram = new int[256];
-                    cumulativeHistogram[0] = histogram[0];
+                    cumulativeHistogram[0] = histogram[0, 0];
+
                     for (int i = 1; i < 256; i++)
                     {
-                        cumulativeHistogram[i] = cumulativeHistogram[i - 1] + histogram[i];
+                        cumulativeHistogram[i] = cumulativeHistogram[i - 1] + histogram[0, i];
                     }
 
-                    for (y = 0; y < height; y++)
+                    // Equalize the Y
+                    for (int y = 0; y < height; y++)
                     {
-                        for (x = 0; x < width; x++)
+                        for (int x = 0; x < width; x++)
                         {
                             dataPtr[0] = (byte)(cumulativeHistogram[dataPtr[0]] * 255 / (width * height));
                             dataPtr += nChan;
@@ -1971,9 +2226,7 @@ namespace SS_OpenCV
                         dataPtr += padding;
                     }
 
-                    // Convert back to RGB
-                    imgYcc.Convert<Bgr, byte>().CopyTo(img);
-
+                    ImageYCbCrtoRGB(m);  // Convert image back to RGB
                 }  
             }
         }
@@ -2056,6 +2309,105 @@ namespace SS_OpenCV
         }
 
 
+        /// <summary>
+        /// Sinal Reader
+        /// </summary>
+        /// <param name="imgDest">imagem de destino (cópia da original)</param>
+        /// <param name="imgOrig">imagem original </param>
+        /// <param name="level">nivel de dificuldade da imagem</param>
+        /// <param name="sinalResult">Objecto resultado - lista de sinais e respectivas informaçoes</param>
+        public static void SinalReader(Image<Bgr, byte> imgDest, Image<Bgr, byte> imgOrig, int level, out Results sinalResult)
+        {
+
+            /*switch (level)
+            {
+                case 1:
+                    //SinalReaderLevel1(imgDest, imgOrig, out sinalResult);
+                    break;
+                case 2:
+                    //SinalReaderLevel2(imgDest, imgOrig, out sinalResult);
+                    break;
+                case 3:
+                    //SinalReaderLevel3(imgDest, imgOrig, out sinalResult);
+                    break;
+                case 4:
+                    //SinalReaderLevel4(imgDest, imgOrig, out sinalResult);
+                    break;
+            }
+
+            sinalResult = new Results();
+
+            //Sinal creation
+            Sinal sinal = new Sinal();
+            sinal.sinalEnum = ResultsEnum.sinal_limite_velocidade;
+            sinal.sinalRect = new Rectangle(10, 10, 200, 200);
+
+            Digito digito = new Digito();
+            digito.digitoRect = new Rectangle(20, 30, 100, 40);
+            digito.digito = "1";
+            sinal.digitos.Add(digito);
+
+            Digito digito2 = new Digito();
+            digito2.digitoRect = new Rectangle(80, 30, 100, 40);
+            digito2.digito = "1";
+            sinal.digitos.Add(digito2);
+
+            imgDest.Draw(sinal.sinalRect, new Bgr(Color.Green));
+
+            // add sinal to results
+            sinalResult.results.Add(sinal);*/
+            sinalResult = new Results();
+
+            // Put image in HSV color space
+            unsafe
+            {
+                MIplImage m = imgDest.MIplImage;
+                byte* dataPtr = (byte*)m.ImageData.ToPointer();
+                byte binary; // binary value of the pixel
+
+                int width = imgDest.Width;
+                int height = imgDest.Height;
+                int nChan = m.NChannels;
+                int padding = m.WidthStep - m.NChannels * m.Width;
+                int widthStep = m.WidthStep;
+                int x, y;
+                (int, byte) maxChannel;
+
+                if (nChan == 3) // image in RGB
+                {
+                    for (y = 0; y < height; y++)
+                    {
+                        for (x = 0; x < width; x++)
+                        {
+                            if (dataPtr[0] > dataPtr[1] && dataPtr[0] > dataPtr[2])
+                            {
+                                maxChannel = (0, dataPtr[0]);
+                            }
+                            else if (dataPtr[1] > dataPtr[0] && dataPtr[1] > dataPtr[2])
+                            {
+                                maxChannel = (1, dataPtr[1]);
+                            }
+                            else
+                            {
+                                maxChannel = (2, dataPtr[2]);
+                            }
+
+                            // store in the image
+                            
+
+                            // advance the pointer to the next pixel
+                            dataPtr += nChan;
+                        }
+
+                        //at the end of the line advance the pointer by the alignment bytes (padding)
+                        dataPtr += padding;
+                    }
+                }
+            }
+
+        }
+
+
 
 
         private static bool IsMatrixSeparable(float[,] matrix, out float[] u, out float[] v)
@@ -2107,7 +2459,7 @@ namespace SS_OpenCV
             return Math.Max(min, Math.Min(value, max));
         }
 
-        private static unsafe void GetNeighboringPixels(byte* dataPtrCopy, int widthStep, int nChan, float xOrigin, float yOrigin, byte[][] neighbors)
+        private static unsafe void GetNeighboringPixels(byte* dataPtrCopy, int widthStep, int nChan, double xOrigin, double yOrigin, byte[][] neighbors)
         {
             int xOriginInt = (int)xOrigin;
             int yOriginInt = (int)yOrigin;
@@ -2131,6 +2483,68 @@ namespace SS_OpenCV
         private static double LinearInterpolation(double a, double b, double delta)
         {
             return a + (b-a) * delta;
+        }
+
+        private static unsafe void ImageRGBtoYCbCr(MIplImage image)
+        {
+            byte* dataPtr = (byte*)image.ImageData.ToPointer();
+
+            int width = image.Width;
+            int height = image.Height;
+            int nChan = image.NChannels;
+            int padding = image.WidthStep - image.NChannels * image.Width;
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    byte R = dataPtr[2];
+                    byte G = dataPtr[1];
+                    byte B = dataPtr[0];
+
+                    double Y = 16 + 0.257 * R + 0.504 * G + 0.098 * B;
+                    double Cb = 128 - 0.148 * R - 0.291 * G + 0.439 * B;
+                    double Cr = 128 + 0.439 * R - 0.368 * G - 0.071 * B;
+
+                    dataPtr[0] = (byte)Clamp(Y, 0, 255);
+                    dataPtr[1] = (byte)Clamp(Cb, 0, 255);
+                    dataPtr[2] = (byte)Clamp(Cr, 0, 255);
+
+                    dataPtr += nChan;
+                }
+                dataPtr += padding;
+            }
+        }
+
+        private static unsafe void ImageYCbCrtoRGB(MIplImage image)
+        {
+            byte* dataPtr = (byte*)image.ImageData.ToPointer();
+
+            int width = image.Width;
+            int height = image.Height;
+            int nChan = image.NChannels;
+            int padding = image.WidthStep - image.NChannels * image.Width;
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    double Y = dataPtr[0];
+                    double Cb = dataPtr[1];
+                    double Cr = dataPtr[2];
+
+                    double R = -222.921 + 1.164 * Y + 1.596 * Cr;
+                    double G = 135.576 + 1.164 * Y - 0.392 * Cb - 0.813 * Cr;
+                    double B = -276.836 + 1.164 * Y + 2.017 * Cb;
+
+                    dataPtr[0] = (byte)Clamp(B, 0, 255);
+                    dataPtr[1] = (byte)Clamp(G, 0, 255);
+                    dataPtr[2] = (byte)Clamp(R, 0, 255);
+
+                    dataPtr += nChan;
+                }
+                dataPtr += padding;
+            }
         }
 
         public static void MeanSolutionAPadding(Image<Bgr, byte> img, int dim)
@@ -2258,5 +2672,78 @@ namespace SS_OpenCV
                 }
             }
         }
+        // This version of Scale_Bilinear uses Parallel.For. It is much slower than the non-parallel version however.
+        /*
+        public static void Scale_Bilinear(Image<Bgr, byte> img, Image<Bgr, byte> imgCopy, float scaleFactor)
+        {
+            unsafe
+            {
+                // direct access to the image memory(sequencial)
+                // direcion top left -> bottom right
+                MIplImage m = img.MIplImage;
+                byte* dataPtr = (byte*)m.ImageData.ToPointer(); // Pointer to the image
+
+                MIplImage mCopy = imgCopy.MIplImage;
+                byte* dataPtrCopy = (byte*)mCopy.ImageData.ToPointer(); // Pointer to the image
+
+                int width = img.Width;
+                int height = img.Height;
+                int nChan = m.NChannels; // number of channels - 3
+                int padding = m.WidthStep - m.NChannels * m.Width; // alingnment bytes (padding)
+                int widthStep = m.WidthStep;
+
+                // Use ThreadLocal storage for neighbors to avoid reallocating in every iteration
+                var neighborsBuffer = new ThreadLocal<byte[][]>(() => new byte[4][]
+                {
+                    new byte[nChan],
+                    new byte[nChan],
+                    new byte[nChan],
+                    new byte[nChan]
+                }); // 4 RGB neighbors (xOrigin, yOrigin) (xOrigin + 1, yOrigin) (xOrigin, yOrigin + 1) (xOrigin + 1, yOrigin + 1)
+
+                float inverseScaleFactor = 1 / scaleFactor;
+
+
+                Parallel.For(0, height, yDestin =>
+                {
+                    // Check if the yOrigin is valid
+                    float yOrigin = yDestin * inverseScaleFactor;
+                    bool yOriginValid = yOrigin >= 0 && yOrigin < height;
+                    float deltaY = yOrigin - (int)yOrigin;
+
+                    byte[][] neighbors = neighborsBuffer.Value;
+
+                    // Calculate the offset for the current row
+                    byte* rowPtr = dataPtr + yDestin * widthStep;
+
+                    for (int xDestin = 0; xDestin < width; xDestin++)
+                    {
+                        float xOrigin = xDestin * inverseScaleFactor;
+
+
+                        if (!yOriginValid || xOrigin < 0 || xOrigin >= width)
+                        {
+                            rowPtr[xDestin * nChan] = rowPtr[xDestin * nChan + 1] = rowPtr[xDestin * nChan + 2] = 0;
+                            continue;
+
+                        }
+
+                        float deltaX = xOrigin - (int)xOrigin;
+
+                        GetNeighboringPixels(dataPtrCopy, widthStep, nChan, xOrigin, yOrigin, neighbors);
+
+                        for (int i = 0; i < nChan; i++)
+                        {
+                            double aY = LinearInterpolation(neighbors[0][i], neighbors[1][i], deltaX);
+                            double bY = LinearInterpolation(neighbors[2][i], neighbors[3][i], deltaX);
+                            rowPtr[xDestin * nChan + i] = (byte)Math.Round(LinearInterpolation(aY, bY, deltaY));
+                        }
+
+                    }
+                });
+                neighborsBuffer.Dispose();
+            }
+
+        }*/
     }
 }

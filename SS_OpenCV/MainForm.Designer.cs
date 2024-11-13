@@ -61,6 +61,7 @@
             this.ImageViewer = new Emgu.CV.UI.ImageBox();
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
             this.statusLabel = new System.Windows.Forms.ToolStripStatusLabel();
+            this.hSVToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip1.SuspendLayout();
             this.panel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.ImageViewer)).BeginInit();
@@ -102,26 +103,26 @@
             // 
             this.openToolStripMenuItem.Name = "openToolStripMenuItem";
             this.openToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.O)));
-            this.openToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.openToolStripMenuItem.Size = new System.Drawing.Size(190, 26);
             this.openToolStripMenuItem.Text = "Open...";
             this.openToolStripMenuItem.Click += new System.EventHandler(this.openToolStripMenuItem_Click);
             // 
             // saveToolStripMenuItem
             // 
             this.saveToolStripMenuItem.Name = "saveToolStripMenuItem";
-            this.saveToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.saveToolStripMenuItem.Size = new System.Drawing.Size(190, 26);
             this.saveToolStripMenuItem.Text = "Save As...";
             this.saveToolStripMenuItem.Click += new System.EventHandler(this.saveToolStripMenuItem_Click);
             // 
             // toolStripMenuItem1
             // 
             this.toolStripMenuItem1.Name = "toolStripMenuItem1";
-            this.toolStripMenuItem1.Size = new System.Drawing.Size(221, 6);
+            this.toolStripMenuItem1.Size = new System.Drawing.Size(187, 6);
             // 
             // exitToolStripMenuItem
             // 
             this.exitToolStripMenuItem.Name = "exitToolStripMenuItem";
-            this.exitToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.exitToolStripMenuItem.Size = new System.Drawing.Size(190, 26);
             this.exitToolStripMenuItem.Text = "Exit";
             this.exitToolStripMenuItem.Click += new System.EventHandler(this.exitToolStripMenuItem_Click);
             // 
@@ -136,7 +137,7 @@
             // undoToolStripMenuItem
             // 
             this.undoToolStripMenuItem.Name = "undoToolStripMenuItem";
-            this.undoToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.undoToolStripMenuItem.Size = new System.Drawing.Size(128, 26);
             this.undoToolStripMenuItem.Text = "Undo";
             this.undoToolStripMenuItem.Click += new System.EventHandler(this.undoToolStripMenuItem_Click);
             // 
@@ -158,7 +159,8 @@
             this.grayToolStripMenuItem,
             this.redChannelToolStripMenuItem,
             this.greenChannelToolStripMenuItem,
-            this.blueChannelToolStripMenuItem});
+            this.blueChannelToolStripMenuItem,
+            this.hSVToolStripMenuItem});
             this.colorToolStripMenuItem.Name = "colorToolStripMenuItem";
             this.colorToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
             this.colorToolStripMenuItem.Text = "Color";
@@ -166,35 +168,35 @@
             // negativeToolStripMenuItem
             // 
             this.negativeToolStripMenuItem.Name = "negativeToolStripMenuItem";
-            this.negativeToolStripMenuItem.Size = new System.Drawing.Size(188, 26);
+            this.negativeToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
             this.negativeToolStripMenuItem.Text = "Negative";
             this.negativeToolStripMenuItem.Click += new System.EventHandler(this.negativeToolStripMenuItem_Click);
             // 
             // grayToolStripMenuItem
             // 
             this.grayToolStripMenuItem.Name = "grayToolStripMenuItem";
-            this.grayToolStripMenuItem.Size = new System.Drawing.Size(188, 26);
+            this.grayToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
             this.grayToolStripMenuItem.Text = "Gray";
             this.grayToolStripMenuItem.Click += new System.EventHandler(this.grayToolStripMenuItem_Click);
             // 
             // redChannelToolStripMenuItem
             // 
             this.redChannelToolStripMenuItem.Name = "redChannelToolStripMenuItem";
-            this.redChannelToolStripMenuItem.Size = new System.Drawing.Size(188, 26);
+            this.redChannelToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
             this.redChannelToolStripMenuItem.Text = "Red Channel";
             this.redChannelToolStripMenuItem.Click += new System.EventHandler(this.redChannelToolStripMenuItem_Click);
             // 
             // greenChannelToolStripMenuItem
             // 
             this.greenChannelToolStripMenuItem.Name = "greenChannelToolStripMenuItem";
-            this.greenChannelToolStripMenuItem.Size = new System.Drawing.Size(188, 26);
+            this.greenChannelToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
             this.greenChannelToolStripMenuItem.Text = "Green Channel";
             this.greenChannelToolStripMenuItem.Click += new System.EventHandler(this.greenChannelToolStripMenuItem_Click);
             // 
             // blueChannelToolStripMenuItem
             // 
             this.blueChannelToolStripMenuItem.Name = "blueChannelToolStripMenuItem";
-            this.blueChannelToolStripMenuItem.Size = new System.Drawing.Size(188, 26);
+            this.blueChannelToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
             this.blueChannelToolStripMenuItem.Text = "Blue Channel";
             this.blueChannelToolStripMenuItem.Click += new System.EventHandler(this.blueChannelToolStripMenuItem_Click);
             // 
@@ -241,13 +243,13 @@
             // mediaToolStripMenuItem
             // 
             this.mediaToolStripMenuItem.Name = "mediaToolStripMenuItem";
-            this.mediaToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.mediaToolStripMenuItem.Size = new System.Drawing.Size(210, 26);
             this.mediaToolStripMenuItem.Text = "Mean - solution A";
             // 
             // nonUniformToolStripMenuItem
             // 
             this.nonUniformToolStripMenuItem.Name = "nonUniformToolStripMenuItem";
-            this.nonUniformToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.nonUniformToolStripMenuItem.Size = new System.Drawing.Size(210, 26);
             this.nonUniformToolStripMenuItem.Text = "NonUniform";
             this.nonUniformToolStripMenuItem.Click += new System.EventHandler(this.nonUniformToolStripMenuItem_Click);
             // 
@@ -316,6 +318,13 @@
             this.statusLabel.Size = new System.Drawing.Size(60, 20);
             this.statusLabel.Text = "X :-   Y:-";
             // 
+            // hSVToolStripMenuItem
+            // 
+            this.hSVToolStripMenuItem.Name = "hSVToolStripMenuItem";
+            this.hSVToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.hSVToolStripMenuItem.Text = "HSV";
+            this.hSVToolStripMenuItem.Click += new System.EventHandler(this.hSVToolStripMenuItem_Click);
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -374,6 +383,7 @@
         private System.Windows.Forms.ToolStripMenuItem greenChannelToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem blueChannelToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem translationToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem hSVToolStripMenuItem;
     }
 }
 
