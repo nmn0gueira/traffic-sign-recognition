@@ -4,6 +4,7 @@ using Emgu.CV;
 using System.Drawing;
 using System.Runtime.CompilerServices;
 using ResultsDLL;
+using Emgu.CV.CvEnum;
 
 namespace SS_OpenCV
 {
@@ -2190,44 +2191,56 @@ namespace SS_OpenCV
         public static void Equalization(Image<Bgr, byte> img)
         {
             unsafe
-            {             
-                MIplImage m = img.MIplImage;
-                byte* dataPtr = (byte*)m.ImageData.ToPointer();
+            {
+                Image<Ycc, byte> imgCopy = img.Convert<Ycc, byte>();
+                MIplImage m = imgCopy.MIplImage;
 
-                int width = img.Width;
-                int height = img.Height;
+                byte* dataPtr = (byte*)m.ImageData.ToPointer();
+                int width = imgCopy.Width;
+                int height = imgCopy.Height;
                 int nChan = m.NChannels;
-                int padding = m.WidthStep - m.NChannels * m.Width;
                 int widthStep = m.WidthStep;
 
-                // If the image is in RGB
-                if (nChan == 3)
+                // Initialize histogram
+                int[] histogram = new int[256];
+                for (int y = 0; y < height; y++)
                 {
-                    ImageRGBtoYCbCr(m);  // Convert image to YCbCr
-
-                    // Get histogram on the YCbCr channels
-                    int[,] histogram = Histogram_RGB(img);
-                    int[] cumulativeHistogram = new int[256];
-                    cumulativeHistogram[0] = histogram[0, 0];
-
-                    for (int i = 1; i < 256; i++)
+                    byte* rowPtr = dataPtr + y * widthStep;
+                    for (int x = 0; x < width; x++)
                     {
-                        cumulativeHistogram[i] = cumulativeHistogram[i - 1] + histogram[0, i];
+                        histogram[rowPtr[0]]++;
+                        rowPtr += nChan;
                     }
+                }
 
-                    // Equalize the Y
-                    for (int y = 0; y < height; y++)
+                // Calculate cumulative histogram
+                int[] cumulativeHistogram = new int[256];
+                cumulativeHistogram[0] = histogram[0];
+                for (int i = 1; i < 256; i++)
+                {
+                    cumulativeHistogram[i] = cumulativeHistogram[i - 1] + histogram[i];
+                }
+
+                // Find minimum cumulative histogram value (ignoring zeroes)
+                int minCumulativeValue = Array.Find(cumulativeHistogram, v => v > 0);
+
+                // Reset dataPtr to the start of the image data
+                dataPtr = (byte*)m.ImageData.ToPointer();
+
+                // Equalize the Y channel using cumulative histogram
+                int totalPixels = width * height;
+                for (int y = 0; y < height; y++)
+                {
+                    byte* rowPtr = dataPtr + y * widthStep;
+                    for (int x = 0; x < width; x++)
                     {
-                        for (int x = 0; x < width; x++)
-                        {
-                            dataPtr[0] = (byte)(cumulativeHistogram[dataPtr[0]] * 255 / (width * height));
-                            dataPtr += nChan;
-                        }
-                        dataPtr += padding;
+                        rowPtr[0] = (byte)Math.Round(((cumulativeHistogram[rowPtr[0]] - minCumulativeValue) * 255.0) / (totalPixels - minCumulativeValue));
+                        rowPtr += nChan;
                     }
+                }
 
-                    ImageYCbCrtoRGB(m);  // Convert image back to RGB
-                }  
+                // Convert modified YCbCr image back to BGR and copy it to the original image
+                imgCopy.Convert<Bgr, byte>().CopyTo(img);
             }
         }
 
@@ -2485,7 +2498,7 @@ namespace SS_OpenCV
             return a + (b-a) * delta;
         }
 
-        private static unsafe void ImageRGBtoYCbCr(MIplImage image)
+        private static unsafe void ImageRGBtoYCrCb(MIplImage image)
         {
             byte* dataPtr = (byte*)image.ImageData.ToPointer();
 
@@ -2493,6 +2506,34 @@ namespace SS_OpenCV
             int height = image.Height;
             int nChan = image.NChannels;
             int padding = image.WidthStep - image.NChannels * image.Width;
+
+            float delta;
+
+            switch(image.Depth)
+            {
+                case IplDepth.IplDepth_8U: 
+                case IplDepth.IplDepth_8S:
+                {
+                    delta = 128;
+                    break;
+                }
+                case IplDepth.IplDepth16U: 
+                case IplDepth.IplDepth16S:
+                {
+                    delta = 32768;
+                    break;
+                }
+                case IplDepth.IplDepth32F: 
+                case IplDepth.IplDepth64F:
+                {
+                    delta = 0.5f;
+                    break;
+                }
+                default:
+                {
+                    throw new InvalidOperationException("Image of invalid depth");
+                }
+            }
 
             for (int y = 0; y < height; y++)
             {
@@ -2502,13 +2543,14 @@ namespace SS_OpenCV
                     byte G = dataPtr[1];
                     byte B = dataPtr[0];
 
-                    double Y = 16 + 0.257 * R + 0.504 * G + 0.098 * B;
-                    double Cb = 128 - 0.148 * R - 0.291 * G + 0.439 * B;
-                    double Cr = 128 + 0.439 * R - 0.368 * G - 0.071 * B;
+                    double Y = 0.299 * R + 0.587 * G + 0.114 * B;
+                    double Cr = (R - Y) * 0.713 + delta;
+                    double Cb = (B - Y) * 0.564 + delta;
+
 
                     dataPtr[0] = (byte)Clamp(Y, 0, 255);
-                    dataPtr[1] = (byte)Clamp(Cb, 0, 255);
-                    dataPtr[2] = (byte)Clamp(Cr, 0, 255);
+                    dataPtr[1] = (byte)Clamp(Cr, 0, 255);
+                    dataPtr[2] = (byte)Clamp(Cb, 0, 255);
 
                     dataPtr += nChan;
                 }
@@ -2516,7 +2558,7 @@ namespace SS_OpenCV
             }
         }
 
-        private static unsafe void ImageYCbCrtoRGB(MIplImage image)
+        private static unsafe void ImageYCrCbtoRGB(MIplImage image)
         {
             byte* dataPtr = (byte*)image.ImageData.ToPointer();
 
@@ -2525,17 +2567,46 @@ namespace SS_OpenCV
             int nChan = image.NChannels;
             int padding = image.WidthStep - image.NChannels * image.Width;
 
+            float delta;
+
+            switch (image.Depth)
+            {
+                case IplDepth.IplDepth_8U:
+                case IplDepth.IplDepth_8S:
+                    {
+                        delta = 128;
+                        break;
+                    }
+                case IplDepth.IplDepth16U:
+                case IplDepth.IplDepth16S:
+                    {
+                        delta = 32768;
+                        break;
+                    }
+                case IplDepth.IplDepth32F:
+                case IplDepth.IplDepth64F:
+                    {
+                        delta = 0.5f;
+                        break;
+                    }
+                default:
+                    {
+                        throw new InvalidOperationException("Image of invalid depth");
+                    }
+            }
+
             for (int y = 0; y < height; y++)
             {
                 for (int x = 0; x < width; x++)
                 {
                     double Y = dataPtr[0];
-                    double Cb = dataPtr[1];
-                    double Cr = dataPtr[2];
+                    double Cr = dataPtr[1];
+                    double Cb = dataPtr[2];
 
-                    double R = -222.921 + 1.164 * Y + 1.596 * Cr;
-                    double G = 135.576 + 1.164 * Y - 0.392 * Cb - 0.813 * Cr;
-                    double B = -276.836 + 1.164 * Y + 2.017 * Cb;
+                    double R = Y + 1.403 * (Cr - delta);
+                    double G = Y - 0.714 * (Cr - delta) - 0.344 * (Cb - delta) ;
+                    double B = Y + 1.773 * (Cb - delta);
+
 
                     dataPtr[0] = (byte)Clamp(B, 0, 255);
                     dataPtr[1] = (byte)Clamp(G, 0, 255);
