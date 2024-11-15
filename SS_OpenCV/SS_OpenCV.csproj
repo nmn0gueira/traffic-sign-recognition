@@ -83,6 +83,7 @@
       <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.6.0.0\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
     </Reference>
     <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Windows.Forms.DataVisualization" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
@@ -91,6 +92,12 @@
     </Compile>
     <Compile Include="AuthorsForm.Designer.cs">
       <DependentUpon>AuthorsForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="HistogramForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="HistogramForm.Designer.cs">
+      <DependentUpon>HistogramForm.cs</DependentUpon>
     </Compile>
     <Compile Include="NonUniformFilterForm.cs">
       <SubType>Form</SubType>
@@ -122,6 +129,9 @@
     <EmbeddedResource Include="AuthorsForm.resx">
       <SubType>Designer</SubType>
       <DependentUpon>AuthorsForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="HistogramForm.resx">
+      <DependentUpon>HistogramForm.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="NonUniformFilterForm.resx">
       <DependentUpon>NonUniformFilterForm.cs</DependentUpon>

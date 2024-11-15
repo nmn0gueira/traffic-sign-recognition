@@ -485,7 +485,6 @@ namespace SS_OpenCV
                         {
                             xOrigin = (int)Math.Round(xDestin * inverseScaleFactor + xOffset);
 
-
                             if (!yOriginValid || xOrigin < 0 || xOrigin >= width)
                             {
                                 dataPtr[0] = 0;
@@ -2290,6 +2289,10 @@ namespace SS_OpenCV
             }  
         }
 
+        /// <summary>
+        /// Convert to black and white using Otsu's method to find the threshold
+        /// </summary>
+        /// <param name="img"></param>
         public static void ConvertToBW_Otsu(Image<Bgr, byte> img)
         {
             int[] grayHistogram = Histogram_Gray(img);
