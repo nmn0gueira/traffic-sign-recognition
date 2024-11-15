@@ -12,6 +12,8 @@ namespace SS_OpenCV
         Image<Bgr, Byte> img = null; // working image
         Image<Bgr, Byte> imgUndo = null; // undo backup image - UNDO
         string title_bak = "";
+        int mouseX, mouseY;
+        bool mouseFlag = false;
 
         public MainForm()
         {
@@ -258,7 +260,32 @@ namespace SS_OpenCV
             Cursor = Cursors.Default; // normal cursor
         }
 
-        private void rotationToolStripMenuItem_Click(object sender, EventArgs e)
+        private void nearestNeighborToolStripMenuItem1_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            SingleInputBox form = new SingleInputBox("Rotation", "Radians:");
+            form.ShowDialog();
+
+            if (form.DialogResult == DialogResult.OK)
+            {
+                float angle = Convert.ToSingle(form.ValueTextBox.Text);
+
+                //copy Undo Image
+                imgUndo = img.Copy();
+
+                ImageClass.Rotation(img, imgUndo, angle);
+
+                ImageViewer.Image = img;
+                ImageViewer.Refresh(); // refresh image on the screen
+            }
+
+            Cursor = Cursors.Default; // normal cursor
+        }
+
+        private void bilinearInterpolationToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (img == null) // verify if the image is already opened
                 return;
@@ -283,21 +310,69 @@ namespace SS_OpenCV
             Cursor = Cursors.Default; // normal cursor
         }
 
-        private void zoomToolStripMenuItem_Click(object sender, EventArgs e)
+        private void nearestNeighborToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (img == null) // verify if the image is already opened
                 return;
             Cursor = Cursors.WaitCursor; // clock cursor 
 
-            //copy Undo Image
-            imgUndo = img.Copy();
+            SingleInputBox form = new SingleInputBox("Scale", "Factor:");
+            form.ShowDialog();
 
-            //
+            if (form.DialogResult == DialogResult.OK)
+            {
+                float factor = Convert.ToSingle(form.ValueTextBox.Text);
 
-            ImageViewer.Image = img;
-            ImageViewer.Refresh(); // refresh image on the screen
+                //copy Undo Image
+                imgUndo = img.Copy();
+
+                ImageClass.Scale(img, imgUndo, factor);
+
+                ImageViewer.Image = img;
+                ImageViewer.Refresh(); // refresh image on the screen
+            }
 
             Cursor = Cursors.Default; // normal cursor
+        }
+
+        private void bilinearInterpolationToolStripMenuItem1_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            SingleInputBox form = new SingleInputBox("Scale", "Factor:");
+            form.ShowDialog();
+
+            if (form.DialogResult == DialogResult.OK)
+            {
+                float factor = Convert.ToSingle(form.ValueTextBox.Text);
+
+                //copy Undo Image
+                imgUndo = img.Copy();
+
+                ImageClass.Scale_Bilinear(img, imgUndo, factor);
+
+                ImageViewer.Image = img;
+                ImageViewer.Refresh(); // refresh image on the screen
+            }
+
+            Cursor = Cursors.Default; // normal cursor
+        }
+
+        private void nearestNeighborToolStripMenuItem2_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+
+            // get mouse coordinates using mouseclick event
+            mouseFlag = true;
+            while (mouseFlag) // wait for mouse click
+            {
+                Application.DoEvents();
+            }
         }
 
 
@@ -333,11 +408,6 @@ namespace SS_OpenCV
 
             if (img != null && aux_y < img.Height && aux_x < img.Width)
                 statusLabel.Text = "X:" + aux_x + "  Y:" + aux_y + " - BGR = (" + img.Data[aux_y, aux_x, 0] + "," + img.Data[aux_y, aux_x, 1] + "," + img.Data[aux_y, aux_x, 2] + ")";
-
-        }
-
-        private void colorToolStripMenuItem_Click(object sender, EventArgs e)
-        {
 
         }
 

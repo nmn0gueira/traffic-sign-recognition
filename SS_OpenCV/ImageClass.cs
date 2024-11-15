@@ -566,10 +566,11 @@ namespace SS_OpenCV
 
                         else
                         {
+
                             deltaX = xOrigin - (int)xOrigin;
                             deltaY = yOrigin - (int)yOrigin;
 
-                            GetNeighboringPixels(dataPtrCopy, widthStep, nChan, xOrigin, yOrigin, neighbors);
+                            GetNeighboringPixels((int)xOrigin, (int)yOrigin, width, height, nChan, widthStep, dataPtrCopy, neighbors);
 
                             for (int i = 0; i < nChan; i++)
                             {
@@ -638,7 +639,7 @@ namespace SS_OpenCV
                         {
                             deltaX = xOrigin - (int)xOrigin;
 
-                            GetNeighboringPixels(dataPtrCopy, widthStep, nChan, xOrigin, yOrigin, neighbors);
+                            GetNeighboringPixels((int)xOrigin, (int)yOrigin, width, height, nChan, widthStep, dataPtrCopy, neighbors);
 
                             for (int i = 0; i < nChan; i++)
                             {
@@ -715,7 +716,7 @@ namespace SS_OpenCV
                         {
                             deltaX = xOrigin - (int)xOrigin;
 
-                            GetNeighboringPixels(dataPtrCopy, widthStep, nChan, xOrigin, yOrigin, neighbors);
+                            GetNeighboringPixels((int)xOrigin, (int)yOrigin, width, height, nChan, widthStep, dataPtrCopy, neighbors);
 
                             for (int i = 0; i < nChan; i++)
                             {
@@ -2477,38 +2478,32 @@ namespace SS_OpenCV
             return Math.Max(min, Math.Min(value, max));
         }
 
-        private static unsafe void GetNeighboringPixels(byte* dataPtrCopy, int widthStep, int nChan, double xOrigin, double yOrigin, byte[][] neighbors)
+        private static unsafe void GetNeighboringPixels(
+            int xOrigin, int yOrigin,
+            int width, int height,
+            int nChan, int widthStep,
+            byte* dataPtrCopy, 
+            byte[][] neighbors)
         {
-            int xOriginInt = (int)xOrigin;
-            int yOriginInt = (int)yOrigin;
+            int xClampedNext = (int)Clamp(xOrigin + 1, 0, width - 1);
+            int yClampedNext = (int)Clamp(yOrigin + 1, 0, height - 1);
 
-            bool withinXBounds = xOriginInt + 1 < widthStep / nChan;
-            bool withinYBounds = yOriginInt + 1 < (widthStep / nChan) * nChan;
+            // Fetch clamped neighbors
+            byte* neighbor1Ptr = dataPtrCopy + xOrigin * nChan + yOrigin * widthStep;
+            byte* neighbor2Ptr = dataPtrCopy + xClampedNext * nChan + yOrigin * widthStep;
+            byte* neighbor3Ptr = dataPtrCopy + xOrigin * nChan + yClampedNext * widthStep;
+            byte* neighbor4Ptr = dataPtrCopy + xClampedNext * nChan + yClampedNext * widthStep;
 
-            // Safely assign neighbors
-            if (withinXBounds && withinYBounds && xOriginInt >= 0 && yOriginInt >= 0)
+
+            for (int i = 0; i < nChan; i++)
             {
-                byte* neighbor1Ptr = dataPtrCopy + xOriginInt * nChan + yOriginInt * widthStep;
-                byte* neighbor2Ptr = neighbor1Ptr + nChan;
-                byte* neighbor3Ptr = neighbor1Ptr + widthStep;
-                byte* neighbor4Ptr = neighbor3Ptr + nChan;
+                neighbors[0][i] = neighbor1Ptr[i];
+                neighbors[1][i] = neighbor2Ptr[i];
+                neighbors[2][i] = neighbor3Ptr[i];
+                neighbors[3][i] = neighbor4Ptr[i];
+            }
 
-                for (int i = 0; i < nChan; i++)
-                {
-                    neighbors[0][i] = neighbor1Ptr[i];
-                    neighbors[1][i] = neighbor2Ptr[i];
-                    neighbors[2][i] = neighbor3Ptr[i];
-                    neighbors[3][i] = neighbor4Ptr[i];
-                }
-            }
-            else
-            {
-                // Handle boundary cases, e.g., by setting a default value or copying existing pixels.
-                for (int i = 0; i < nChan; i++)
-                {
-                    neighbors[0][i] = neighbors[1][i] = neighbors[2][i] = neighbors[3][i] = 0;
-                }
-            }
+
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
