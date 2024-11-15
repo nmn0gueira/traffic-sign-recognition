@@ -5,6 +5,7 @@ using System.Drawing;
 using System.Runtime.CompilerServices;
 using ResultsDLL;
 using Emgu.CV.CvEnum;
+using System.Data;
 
 namespace SS_OpenCV
 {
@@ -2187,30 +2188,33 @@ namespace SS_OpenCV
             return histogram;
         }
 
-        // TODO: Implement the histogram equalization function
+
         public static void Equalization(Image<Bgr, byte> img)
         {
             unsafe
             {
-                Image<Ycc, byte> imgCopy = img.Convert<Ycc, byte>();
-                MIplImage m = imgCopy.MIplImage;
+                //Image<Ycc, byte> imgCopy = img.Convert<Ycc, byte>(); // We need the image in YCrCb color space
+                MIplImage m = img.MIplImage;
 
                 byte* dataPtr = (byte*)m.ImageData.ToPointer();
-                int width = imgCopy.Width;
-                int height = imgCopy.Height;
+                int width = img.Width;
+                int height = img.Height;
                 int nChan = m.NChannels;
+                int padding = m.WidthStep - m.NChannels * m.Width;
                 int widthStep = m.WidthStep;
 
-                // Initialize histogram
+                ImageRGBtoYCrCb(m);
+
+                // Obtain histogram on the Y value
                 int[] histogram = new int[256];
                 for (int y = 0; y < height; y++)
                 {
-                    byte* rowPtr = dataPtr + y * widthStep;
                     for (int x = 0; x < width; x++)
                     {
-                        histogram[rowPtr[0]]++;
-                        rowPtr += nChan;
+                        histogram[dataPtr[0]]++;
+                        dataPtr += nChan;
                     }
+                    dataPtr += padding;
                 }
 
                 // Calculate cumulative histogram
@@ -2221,26 +2225,27 @@ namespace SS_OpenCV
                     cumulativeHistogram[i] = cumulativeHistogram[i - 1] + histogram[i];
                 }
 
-                // Find minimum cumulative histogram value (ignoring zeroes)
+                // Find minimum cumulative histogram value (ignoring zeroes), OpenCV uses this
                 int minCumulativeValue = Array.Find(cumulativeHistogram, v => v > 0);
 
-                // Reset dataPtr to the start of the image data
-                dataPtr = (byte*)m.ImageData.ToPointer();
 
-                // Equalize the Y channel using cumulative histogram
+                dataPtr = (byte*)m.ImageData.ToPointer();                
                 int totalPixels = width * height;
+                int aux = totalPixels - minCumulativeValue;
+
+                // Equalize the Y channel
                 for (int y = 0; y < height; y++)
                 {
-                    byte* rowPtr = dataPtr + y * widthStep;
                     for (int x = 0; x < width; x++)
                     {
-                        rowPtr[0] = (byte)Math.Round(((cumulativeHistogram[rowPtr[0]] - minCumulativeValue) * 255.0) / (totalPixels - minCumulativeValue));
-                        rowPtr += nChan;
+                        dataPtr[0] = (byte)Math.Round(((cumulativeHistogram[dataPtr[0]] - minCumulativeValue) * 255.0) / (totalPixels - minCumulativeValue));
+                        dataPtr += nChan;
                     }
+                    dataPtr += padding;
                 }
 
-                // Convert modified YCbCr image back to BGR and copy it to the original image
-                imgCopy.Convert<Bgr, byte>().CopyTo(img);
+                ImageYCrCbtoRGB(m);
+                //imgCopy.Convert<Bgr, byte>().CopyTo(img); // Convert modified YCrCb image back to BGR and copy it to the original image
             }
         }
 
@@ -2477,18 +2482,32 @@ namespace SS_OpenCV
             int xOriginInt = (int)xOrigin;
             int yOriginInt = (int)yOrigin;
 
-            // directly populate neighbors array without creating new arrays every call
-            byte* neighbor1Ptr = dataPtrCopy + xOriginInt * nChan + yOriginInt * widthStep;
-            byte* neighbor2Ptr = neighbor1Ptr + nChan;
-            byte* neighbor3Ptr = neighbor1Ptr + widthStep;
-            byte* neighbor4Ptr = neighbor3Ptr + nChan;
+            bool withinXBounds = xOriginInt + 1 < widthStep / nChan;
+            bool withinYBounds = yOriginInt + 1 < (widthStep / nChan) * nChan;
 
-            for (int i = 0; i < nChan; i++)
+            // Safely assign neighbors
+            if (withinXBounds && withinYBounds && xOriginInt >= 0 && yOriginInt >= 0)
             {
-                neighbors[0][i] = neighbor1Ptr[i];
-                neighbors[1][i] = neighbor2Ptr[i];
-                neighbors[2][i] = neighbor3Ptr[i];
-                neighbors[3][i] = neighbor4Ptr[i];
+                byte* neighbor1Ptr = dataPtrCopy + xOriginInt * nChan + yOriginInt * widthStep;
+                byte* neighbor2Ptr = neighbor1Ptr + nChan;
+                byte* neighbor3Ptr = neighbor1Ptr + widthStep;
+                byte* neighbor4Ptr = neighbor3Ptr + nChan;
+
+                for (int i = 0; i < nChan; i++)
+                {
+                    neighbors[0][i] = neighbor1Ptr[i];
+                    neighbors[1][i] = neighbor2Ptr[i];
+                    neighbors[2][i] = neighbor3Ptr[i];
+                    neighbors[3][i] = neighbor4Ptr[i];
+                }
+            }
+            else
+            {
+                // Handle boundary cases, e.g., by setting a default value or copying existing pixels.
+                for (int i = 0; i < nChan; i++)
+                {
+                    neighbors[0][i] = neighbors[1][i] = neighbors[2][i] = neighbors[3][i] = 0;
+                }
             }
         }
 
@@ -2498,7 +2517,7 @@ namespace SS_OpenCV
             return a + (b-a) * delta;
         }
 
-        private static unsafe void ImageRGBtoYCrCb(MIplImage image)
+        public static unsafe void ImageRGBtoYCrCb(MIplImage image)
         {
             byte* dataPtr = (byte*)image.ImageData.ToPointer();
 
@@ -2548,9 +2567,9 @@ namespace SS_OpenCV
                     double Cb = (B - Y) * 0.564 + delta;
 
 
-                    dataPtr[0] = (byte)Clamp(Y, 0, 255);
-                    dataPtr[1] = (byte)Clamp(Cr, 0, 255);
-                    dataPtr[2] = (byte)Clamp(Cb, 0, 255);
+                    dataPtr[0] = (byte)Clamp(Math.Round(Y), 0, 255);
+                    dataPtr[1] = (byte)Clamp(Math.Round(Cr), 0, 255);
+                    dataPtr[2] = (byte)Clamp(Math.Round(Cb), 0, 255);
 
                     dataPtr += nChan;
                 }
@@ -2558,7 +2577,7 @@ namespace SS_OpenCV
             }
         }
 
-        private static unsafe void ImageYCrCbtoRGB(MIplImage image)
+        public static unsafe void ImageYCrCbtoRGB(MIplImage image)
         {
             byte* dataPtr = (byte*)image.ImageData.ToPointer();
 
@@ -2608,9 +2627,9 @@ namespace SS_OpenCV
                     double B = Y + 1.773 * (Cb - delta);
 
 
-                    dataPtr[0] = (byte)Clamp(B, 0, 255);
-                    dataPtr[1] = (byte)Clamp(G, 0, 255);
-                    dataPtr[2] = (byte)Clamp(R, 0, 255);
+                    dataPtr[0] = (byte)Clamp(Math.Round(B), 0, 255);
+                    dataPtr[1] = (byte)Clamp(Math.Round(G), 0, 255);
+                    dataPtr[2] = (byte)Clamp(Math.Round(R), 0, 255);
 
                     dataPtr += nChan;
                 }

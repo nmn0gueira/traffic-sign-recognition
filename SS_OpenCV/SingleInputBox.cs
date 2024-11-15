@@ -8,19 +8,27 @@ using System.Windows.Forms;
 
 namespace SS_OpenCV
 {
-    public partial class InputBox : Form
+    public partial class SingleInputBox : Form
     {
-        public InputBox()
+        public SingleInputBox()
         {
             InitializeComponent();
         }
-        public InputBox(string _title)
+        public SingleInputBox(string _title)
         {
             InitializeComponent();
 
             this.Text = _title;
-
         }
+
+        public SingleInputBox(string _title, string _label)
+        {
+            InitializeComponent();
+
+            this.Text = _title;
+            this.label1.Text = _label;
+        }
+
         public static string GetValue()
         {
             return GetValue("");
@@ -28,7 +36,7 @@ namespace SS_OpenCV
 
         public static int GetIntValue(string title)
         {
-            InputBox form = new InputBox();
+            SingleInputBox form = new SingleInputBox();
             form.Text = title;
 
             form.button1.Click += form.button1_Click;
@@ -41,7 +49,7 @@ namespace SS_OpenCV
 
         public static string GetValue(string title)
         {
-            InputBox form = new InputBox();
+            SingleInputBox form = new SingleInputBox();
             form.Text=title;
             if (form.ShowDialog() == DialogResult.OK)
                return form.ValueTextBox.Text;
@@ -62,7 +70,7 @@ namespace SS_OpenCV
 
         public static string GetValue(string title, string value)
         {
-            InputBox form = new InputBox();
+            SingleInputBox form = new SingleInputBox();
             form.Text = title;
             form.ValueTextBox.Text = value;
 

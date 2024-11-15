@@ -8,39 +8,52 @@ using System.Windows.Forms;
 
 namespace SS_OpenCV
 {
-    public partial class RotationInputBox : Form
+    public partial class DoubleInputBox : Form
     {
-        public RotationInputBox()
+        public DoubleInputBox()
         {
             InitializeComponent();
         }
-        public RotationInputBox(string _title)
+        public DoubleInputBox(string _title)
         {
             InitializeComponent();
 
             this.Text = _title;
+        }
 
+        public DoubleInputBox(string _title, string _label1, string _label2)
+        {
+            InitializeComponent();
+
+            this.Text = _title;
+            this.label1.Text = _label1;
+            this.label2.Text = _label2;
+        }
+
+        public static string GetValue()
+        {
+            return GetValue("");
         }
 
         public static int GetIntValue(string title)
         {
-            RotationInputBox form = new RotationInputBox();
+            DoubleInputBox form = new DoubleInputBox();
             form.Text = title;
 
             form.button1.Click += form.button1_Click;
 
             if (form.ShowDialog() == DialogResult.OK)
-                return Convert.ToInt32(form.angle.Text);
+                return Convert.ToInt32(form.ValueTextBox1.Text);
             return -1;
         }
 
 
         public static string GetValue(string title)
         {
-            RotationInputBox form = new RotationInputBox();
+            DoubleInputBox form = new DoubleInputBox();
             form.Text=title;
             if (form.ShowDialog() == DialogResult.OK)
-               return form.angle.Text;
+               return form.ValueTextBox1.Text;
            return null;
         }
 
@@ -58,12 +71,12 @@ namespace SS_OpenCV
 
         public static string GetValue(string title, string value)
         {
-            RotationInputBox form = new RotationInputBox();
+            DoubleInputBox form = new DoubleInputBox();
             form.Text = title;
-            form.angle.Text = value;
+            form.ValueTextBox1.Text = value;
 
             if (form.ShowDialog() == DialogResult.OK)
-                return form.angle.Text;
+                return form.ValueTextBox1.Text;
             return null;
         }
     }

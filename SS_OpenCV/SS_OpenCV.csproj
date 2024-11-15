@@ -99,23 +99,17 @@
       <DependentUpon>NonUniformFilterForm.cs</DependentUpon>
     </Compile>
     <Compile Include="ImageClass.cs" />
-    <Compile Include="RotationInputBox.cs">
+    <Compile Include="DoubleInputBox.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="RotationInputBox.designer.cs">
-      <DependentUpon>RotationInputBox.cs</DependentUpon>
+    <Compile Include="DoubleInputBox.designer.cs">
+      <DependentUpon>DoubleInputBox.cs</DependentUpon>
     </Compile>
-    <Compile Include="TranslationInputBox.cs">
+    <Compile Include="SingleInputBox.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="TranslationInputBox.designer.cs">
-      <DependentUpon>TranslationInputBox.cs</DependentUpon>
-    </Compile>
-    <Compile Include="InputBox.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="InputBox.designer.cs">
-      <DependentUpon>InputBox.cs</DependentUpon>
+    <Compile Include="SingleInputBox.designer.cs">
+      <DependentUpon>SingleInputBox.cs</DependentUpon>
     </Compile>
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
@@ -132,16 +126,12 @@
     <EmbeddedResource Include="NonUniformFilterForm.resx">
       <DependentUpon>NonUniformFilterForm.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="RotationInputBox.resx">
-      <DependentUpon>RotationInputBox.cs</DependentUpon>
+    <EmbeddedResource Include="DoubleInputBox.resx">
+      <DependentUpon>DoubleInputBox.cs</DependentUpon>
       <SubType>Designer</SubType>
     </EmbeddedResource>
-    <EmbeddedResource Include="TranslationInputBox.resx">
-      <DependentUpon>TranslationInputBox.cs</DependentUpon>
-      <SubType>Designer</SubType>
-    </EmbeddedResource>
-    <EmbeddedResource Include="InputBox.resx">
-      <DependentUpon>InputBox.cs</DependentUpon>
+    <EmbeddedResource Include="SingleInputBox.resx">
+      <DependentUpon>SingleInputBox.cs</DependentUpon>
       <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="MainForm.resx">

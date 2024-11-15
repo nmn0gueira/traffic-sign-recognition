@@ -44,9 +44,13 @@
             this.colorToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.negativeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.grayToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.brightnessAndContrastToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.redChannelToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.greenChannelToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.blueChannelToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.hSVToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.yCrCbToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.yccTestToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.transformsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.translationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.rotationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -61,7 +65,6 @@
             this.ImageViewer = new Emgu.CV.UI.ImageBox();
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
             this.statusLabel = new System.Windows.Forms.ToolStripStatusLabel();
-            this.hSVToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip1.SuspendLayout();
             this.panel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.ImageViewer)).BeginInit();
@@ -157,10 +160,13 @@
             this.colorToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.negativeToolStripMenuItem,
             this.grayToolStripMenuItem,
+            this.brightnessAndContrastToolStripMenuItem,
             this.redChannelToolStripMenuItem,
             this.greenChannelToolStripMenuItem,
             this.blueChannelToolStripMenuItem,
-            this.hSVToolStripMenuItem});
+            this.hSVToolStripMenuItem,
+            this.yCrCbToolStripMenuItem,
+            this.yccTestToolStripMenuItem});
             this.colorToolStripMenuItem.Name = "colorToolStripMenuItem";
             this.colorToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
             this.colorToolStripMenuItem.Text = "Color";
@@ -168,37 +174,65 @@
             // negativeToolStripMenuItem
             // 
             this.negativeToolStripMenuItem.Name = "negativeToolStripMenuItem";
-            this.negativeToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.negativeToolStripMenuItem.Size = new System.Drawing.Size(248, 26);
             this.negativeToolStripMenuItem.Text = "Negative";
             this.negativeToolStripMenuItem.Click += new System.EventHandler(this.negativeToolStripMenuItem_Click);
             // 
             // grayToolStripMenuItem
             // 
             this.grayToolStripMenuItem.Name = "grayToolStripMenuItem";
-            this.grayToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.grayToolStripMenuItem.Size = new System.Drawing.Size(248, 26);
             this.grayToolStripMenuItem.Text = "Gray";
             this.grayToolStripMenuItem.Click += new System.EventHandler(this.grayToolStripMenuItem_Click);
+            // 
+            // brightnessAndContrastToolStripMenuItem
+            // 
+            this.brightnessAndContrastToolStripMenuItem.Name = "brightnessAndContrastToolStripMenuItem";
+            this.brightnessAndContrastToolStripMenuItem.Size = new System.Drawing.Size(248, 26);
+            this.brightnessAndContrastToolStripMenuItem.Text = "Brightness and Contrast";
+            this.brightnessAndContrastToolStripMenuItem.Click += new System.EventHandler(this.brightnessAndContrastToolStripMenuItem_Click);
             // 
             // redChannelToolStripMenuItem
             // 
             this.redChannelToolStripMenuItem.Name = "redChannelToolStripMenuItem";
-            this.redChannelToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.redChannelToolStripMenuItem.Size = new System.Drawing.Size(248, 26);
             this.redChannelToolStripMenuItem.Text = "Red Channel";
             this.redChannelToolStripMenuItem.Click += new System.EventHandler(this.redChannelToolStripMenuItem_Click);
             // 
             // greenChannelToolStripMenuItem
             // 
             this.greenChannelToolStripMenuItem.Name = "greenChannelToolStripMenuItem";
-            this.greenChannelToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.greenChannelToolStripMenuItem.Size = new System.Drawing.Size(248, 26);
             this.greenChannelToolStripMenuItem.Text = "Green Channel";
             this.greenChannelToolStripMenuItem.Click += new System.EventHandler(this.greenChannelToolStripMenuItem_Click);
             // 
             // blueChannelToolStripMenuItem
             // 
             this.blueChannelToolStripMenuItem.Name = "blueChannelToolStripMenuItem";
-            this.blueChannelToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.blueChannelToolStripMenuItem.Size = new System.Drawing.Size(248, 26);
             this.blueChannelToolStripMenuItem.Text = "Blue Channel";
             this.blueChannelToolStripMenuItem.Click += new System.EventHandler(this.blueChannelToolStripMenuItem_Click);
+            // 
+            // hSVToolStripMenuItem
+            // 
+            this.hSVToolStripMenuItem.Name = "hSVToolStripMenuItem";
+            this.hSVToolStripMenuItem.Size = new System.Drawing.Size(248, 26);
+            this.hSVToolStripMenuItem.Text = "HSV";
+            this.hSVToolStripMenuItem.Click += new System.EventHandler(this.hSVToolStripMenuItem_Click);
+            // 
+            // yCrCbToolStripMenuItem
+            // 
+            this.yCrCbToolStripMenuItem.Name = "yCrCbToolStripMenuItem";
+            this.yCrCbToolStripMenuItem.Size = new System.Drawing.Size(248, 26);
+            this.yCrCbToolStripMenuItem.Text = "YCrCb";
+            this.yCrCbToolStripMenuItem.Click += new System.EventHandler(this.yCrCbToolStripMenuItem_Click);
+            // 
+            // yccTestToolStripMenuItem
+            // 
+            this.yccTestToolStripMenuItem.Name = "yccTestToolStripMenuItem";
+            this.yccTestToolStripMenuItem.Size = new System.Drawing.Size(248, 26);
+            this.yccTestToolStripMenuItem.Text = "YccTest";
+            this.yccTestToolStripMenuItem.Click += new System.EventHandler(this.yccTestToolStripMenuItem_Click);
             // 
             // transformsToolStripMenuItem
             // 
@@ -264,8 +298,8 @@
             // autoresToolStripMenuItem
             // 
             this.autoresToolStripMenuItem.Name = "autoresToolStripMenuItem";
-            this.autoresToolStripMenuItem.Size = new System.Drawing.Size(83, 24);
-            this.autoresToolStripMenuItem.Text = "Autores...";
+            this.autoresToolStripMenuItem.Size = new System.Drawing.Size(69, 24);
+            this.autoresToolStripMenuItem.Text = "Autor...";
             this.autoresToolStripMenuItem.Click += new System.EventHandler(this.autoresToolStripMenuItem_Click);
             // 
             // evalToolStripMenuItem
@@ -317,13 +351,6 @@
             this.statusLabel.Name = "statusLabel";
             this.statusLabel.Size = new System.Drawing.Size(60, 20);
             this.statusLabel.Text = "X :-   Y:-";
-            // 
-            // hSVToolStripMenuItem
-            // 
-            this.hSVToolStripMenuItem.Name = "hSVToolStripMenuItem";
-            this.hSVToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
-            this.hSVToolStripMenuItem.Text = "HSV";
-            this.hSVToolStripMenuItem.Click += new System.EventHandler(this.hSVToolStripMenuItem_Click);
             // 
             // MainForm
             // 
@@ -384,6 +411,9 @@
         private System.Windows.Forms.ToolStripMenuItem blueChannelToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem translationToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem hSVToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem yCrCbToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem yccTestToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem brightnessAndContrastToolStripMenuItem;
     }
 }
 

@@ -154,6 +154,32 @@ namespace SS_OpenCV
             Cursor = Cursors.Default; // normal cursor
         }
 
+        private void brightnessAndContrastToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            DoubleInputBox form = new DoubleInputBox("Brightness and Contrast", "Brightness:", "Contrast:");
+            form.ShowDialog();
+
+            if (form.DialogResult == DialogResult.OK)
+            {
+                int brightness = Convert.ToInt32(form.ValueTextBox1.Text);
+                int contrast = Convert.ToInt32(form.ValueTextBox2.Text);
+
+                //copy Undo Image
+                imgUndo = img.Copy();
+
+                ImageClass.BrightContrast(img, brightness, contrast);
+
+                ImageViewer.Image = img;
+                ImageViewer.Refresh(); // refresh image on the screen
+            }
+
+            Cursor = Cursors.Default; // normal cursor
+        }
+
         private void redChannelToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (img == null) // verify if the image is already opened
@@ -212,13 +238,22 @@ namespace SS_OpenCV
                 return;
             Cursor = Cursors.WaitCursor; // clock cursor 
 
-            //copy Undo Image
-            imgUndo = img.Copy();
+            DoubleInputBox form = new DoubleInputBox("Translation", "X-Axis:", "Y-Axis:");
+            form.ShowDialog();
 
-            //ImageClass.Translation(img, img.Copy(), translation.Item1, translation.Item2);
+            if (form.DialogResult == DialogResult.OK)
+            {
+                int x = Convert.ToInt32(form.ValueTextBox1.Text);
+                int y = Convert.ToInt32(form.ValueTextBox2.Text);
 
-            ImageViewer.Image = img;
-            ImageViewer.Refresh(); // refresh image on the screen
+                //copy Undo Image
+                imgUndo = img.Copy();
+
+                ImageClass.Translation(img, imgUndo, x, y);
+
+                ImageViewer.Image = img;
+                ImageViewer.Refresh(); // refresh image on the screen
+            }
 
             Cursor = Cursors.Default; // normal cursor
         }
@@ -229,14 +264,21 @@ namespace SS_OpenCV
                 return;
             Cursor = Cursors.WaitCursor; // clock cursor 
 
-            //copy Undo Image
-            imgUndo = img.Copy();
+            SingleInputBox form = new SingleInputBox("Rotation", "Radians:");
+            form.ShowDialog();
 
-            //
+            if (form.DialogResult == DialogResult.OK)
+            {
+                float angle = Convert.ToSingle(form.ValueTextBox.Text);
 
+                //copy Undo Image
+                imgUndo = img.Copy();
 
-            ImageViewer.Image = img;
-            ImageViewer.Refresh(); // refresh image on the screen
+                ImageClass.Rotation_Bilinear(img, imgUndo, angle);
+
+                ImageViewer.Image = img;
+                ImageViewer.Refresh(); // refresh image on the screen
+            }
 
             Cursor = Cursors.Default; // normal cursor
         }
@@ -335,9 +377,44 @@ namespace SS_OpenCV
 
             Cursor = Cursors.Default; // normal cursor
         }
+
+        private void yCrCbToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
+
+            ImageClass.ImageRGBtoYCrCb(img.MIplImage);
+
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
+        }
+
+        private void yccTestToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
+
+            ImageClass.ImageRGBtoYCrCb(img.MIplImage);
+            ImageClass.ImageYCrCbtoRGB(img.MIplImage);
+
+            /*
+            img.Convert<Ycc, byte>().CopyTo(img);
+            img.Convert<Bgr, byte>().CopyTo(img);*/
+
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
+        }
     }
-
-
-
-
 }
