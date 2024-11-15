@@ -2395,36 +2395,7 @@ namespace SS_OpenCV
                 int x, y;
                 (int, byte) maxChannel;
 
-                if (nChan == 3) // image in RGB
-                {
-                    for (y = 0; y < height; y++)
-                    {
-                        for (x = 0; x < width; x++)
-                        {
-                            if (dataPtr[0] > dataPtr[1] && dataPtr[0] > dataPtr[2])
-                            {
-                                maxChannel = (0, dataPtr[0]);
-                            }
-                            else if (dataPtr[1] > dataPtr[0] && dataPtr[1] > dataPtr[2])
-                            {
-                                maxChannel = (1, dataPtr[1]);
-                            }
-                            else
-                            {
-                                maxChannel = (2, dataPtr[2]);
-                            }
-
-                            // store in the image
-                            
-
-                            // advance the pointer to the next pixel
-                            dataPtr += nChan;
-                        }
-
-                        //at the end of the line advance the pointer by the alignment bytes (padding)
-                        dataPtr += padding;
-                    }
-                }
+                
             }
 
         }
@@ -2628,6 +2599,58 @@ namespace SS_OpenCV
                     dataPtr[0] = (byte)Clamp(Math.Round(B), 0, 255);
                     dataPtr[1] = (byte)Clamp(Math.Round(G), 0, 255);
                     dataPtr[2] = (byte)Clamp(Math.Round(R), 0, 255);
+
+                    dataPtr += nChan;
+                }
+                dataPtr += padding;
+            }
+        }
+
+        public static unsafe void ImageRGBtoHSV(MIplImage image)
+        {
+            byte* dataPtr = (byte*)image.ImageData.ToPointer();
+
+            int width = image.Width;
+            int height = image.Height;
+            int nChan = image.NChannels;
+            int padding = image.WidthStep - image.NChannels * image.Width;
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    // Get the RGB values as 0 to 1 range
+                    double R = dataPtr[2] / 255f;
+                    double G = dataPtr[1] / 255f;
+                    double B = dataPtr[0] / 255f;
+
+                    double minChannel = Math.Min(R, Math.Min(G, B));
+
+                    double V = Math.Max(R, Math.Max(G, B));
+                    double S = V == 0 ? 0 : (V - minChannel) / V;
+                    double H = 0;
+
+                    if (V == R)
+                    {
+                        H = 60 * (G - B) / (V - minChannel);
+                    }
+                    else if (V == G)
+                    {
+                        H = 120 + 60 * (B - R) / (V - minChannel);
+                    }
+                    else if (V == B)
+                    {
+                        H = 240 + 60 * (R - G) / (V - minChannel);
+                    }
+
+                    if (H < 0)
+                    {
+                        H += 360;
+                    }
+
+                    dataPtr[0] = (byte)Clamp(Math.Round(H / 2f), 0, 255);
+                    dataPtr[1] = (byte)Clamp(Math.Round(S * 255), 0, 255);
+                    dataPtr[2] = (byte)Clamp(Math.Round(V * 255), 0, 255);
 
                     dataPtr += nChan;
                 }
