@@ -2546,7 +2546,7 @@ namespace SS_OpenCV
             }
         }
 
-        public static unsafe void ImageYCrCbtoRGB(MIplImage image)
+        private static unsafe void ImageYCrCbtoRGB(MIplImage image)
         {
             byte* dataPtr = (byte*)image.ImageData.ToPointer();
 
@@ -2606,14 +2606,15 @@ namespace SS_OpenCV
             }
         }
 
-        public static unsafe void ImageRGBtoHSV(MIplImage image)
+        public static unsafe void ImageRGBtoHSV(Image<Bgr, byte> img)
         {
-            byte* dataPtr = (byte*)image.ImageData.ToPointer();
+            MIplImage m = img.MIplImage;
+            byte* dataPtr = (byte*)m.ImageData.ToPointer();
 
-            int width = image.Width;
-            int height = image.Height;
-            int nChan = image.NChannels;
-            int padding = image.WidthStep - image.NChannels * image.Width;
+            int width = m.Width;
+            int height = m.Height;
+            int nChan = m.NChannels;
+            int padding = m.WidthStep - m.NChannels * m.Width;
 
             for (int y = 0; y < height; y++)
             {
@@ -2651,6 +2652,51 @@ namespace SS_OpenCV
                     dataPtr[0] = (byte)Clamp(Math.Round(H / 2f), 0, 255);
                     dataPtr[1] = (byte)Clamp(Math.Round(S * 255), 0, 255);
                     dataPtr[2] = (byte)Clamp(Math.Round(V * 255), 0, 255);
+
+                    dataPtr += nChan;
+                }
+                dataPtr += padding;
+            }
+        }
+
+        /// <summary>
+        /// Binarizes the image with red as white and everything else as black.
+        /// </summary>
+        /// <param name="img"></param> 
+        public static unsafe void BinarizeOnRed(Image<Bgr, byte> img)
+        {
+            ImageRGBtoHSV(img);
+
+            MIplImage m = img.MIplImage;
+            byte* dataPtr = (byte*)m.ImageData.ToPointer();
+
+            int minSaturation = 150, minValue = 50;
+
+            int width = m.Width;
+            int height = m.Height;
+            int nChan = m.NChannels;
+            int padding = m.WidthStep - m.NChannels * m.Width;
+
+
+            
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    if ((dataPtr[0] <= 10 || dataPtr[0] >=  170) && dataPtr[1] >= minSaturation && dataPtr[2] >= minValue)
+                    {
+                        dataPtr[0] = 255;
+                        dataPtr[1] = 255;
+                        dataPtr[2] = 255;
+                    }
+
+                    else
+                    {
+                        dataPtr[0] = 0;
+                        dataPtr[1] = 0;
+                        dataPtr[2] = 0;
+                    }
+                    
 
                     dataPtr += nChan;
                 }

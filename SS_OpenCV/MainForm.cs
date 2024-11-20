@@ -305,7 +305,7 @@ namespace SS_OpenCV
             imgUndo = img.Copy();
 
             //img.Convert<Hsv, byte>().CopyTo(img);
-            ImageClass.ImageRGBtoHSV(img.MIplImage);
+            ImageClass.ImageRGBtoHSV(img);
 
             ImageViewer.Image = img;
             ImageViewer.Refresh(); // refresh image on the screen
@@ -800,7 +800,24 @@ namespace SS_OpenCV
 
                 mouseFlag = false;
             }
-        }    
+        }
+
+        private void debugBinarizationToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
+
+            ImageClass.BinarizeOnRed(img);
+
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
+        }
 
         private void ImageViewer_MouseMove(object sender, MouseEventArgs e)
         {
