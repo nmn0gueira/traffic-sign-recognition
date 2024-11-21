@@ -778,6 +778,82 @@ namespace SS_OpenCV
             Cursor = Cursors.Default; // normal cursor
         }
 
+        private void dilationToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
+
+            bool[,] mask = new bool[3, 3] { { true, true, true }, { true, true, true }, { true, true, true } };
+
+            ImageClass.Dilation(img, mask);
+
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
+        }
+
+        private void erosionToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
+
+            bool[,] mask = new bool[3, 3] { { true, true, true }, { true, true, true }, { true, true, true } };
+
+            ImageClass.Erosion(img, mask);
+
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
+        }
+
+        private void openingToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
+
+            bool[,] mask = new bool[3, 3] { { true, true, true }, { true, true, true }, { true, true, true } };
+
+            ImageClass.Opening(img, mask);
+
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
+        }
+
+        private void closureToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
+
+            bool[,] mask = new bool[3, 3] { { true, true, true }, { true, true, true }, { true, true, true } };
+
+            ImageClass.Closing(img, mask);
+
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
+        }
+
 
         /// <summary>
         /// Call automated image processing check
@@ -812,6 +888,27 @@ namespace SS_OpenCV
             imgUndo = img.Copy();
 
             ImageClass.BinarizeOnRed(img);
+
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
+        }
+
+        private void connectedCompDebugToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
+
+            Image<Bgr, byte> imgCopy1 = img.Copy();
+            Image<Bgr, byte> imgCopy2 = img.Copy();
+
+            ImageClass.BinarizeOnRed(img);
+            //CvInvoke.ConnectedComponentsWithStats(img.Convert<B, byte>(), imgUndo, imgCopy1, imgCopy2);
 
             ImageViewer.Image = img;
             ImageViewer.Refresh(); // refresh image on the screen

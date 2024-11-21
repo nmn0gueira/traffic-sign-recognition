@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using ResultsDLL;
 using Emgu.CV.CvEnum;
 using System.Data;
+using System.Collections.Generic;
 
 namespace SS_OpenCV
 {
@@ -2330,6 +2331,197 @@ namespace SS_OpenCV
             ConvertToBW(img, threshold);
         }
 
+        /// <summary>
+        /// Dilates image. Dilating means replacing each pixel's intensity with the highest intensity of its neighbors (according to the binary mask).
+        /// </summary>
+        /// <param name="img"></param>
+        /// <param name="mask"></param>
+        public static void Dilation(Image<Bgr, byte> img, bool[,] mask)
+        {
+            if (mask.GetLength(0) % 2 == 0 || mask.GetLength(1) % 2 == 0)
+            {
+                throw new ArgumentException("Mask dimensions must be odd");
+            }
+
+            if (mask.GetLength(0) != mask.GetLength(1))
+            {
+                throw new ArgumentException("Mask must be square");
+            }
+
+            HashSet<(int, int)> relativePoints = GetRelativePoints(mask);
+
+            unsafe
+            {
+                MIplImage m = img.MIplImage;
+                byte* dataPtr = (byte*)m.ImageData.ToPointer();
+
+                int halfDim = mask.GetLength(0) / 2;
+
+                Image<Bgr, byte> imgCopyPadded = new Image<Bgr, Byte>(img.Width + halfDim * 2, img.Height + halfDim * 2);
+                // Pad the copy image using OpenCV
+                CvInvoke.CopyMakeBorder(img, imgCopyPadded, halfDim, halfDim, halfDim, halfDim, Emgu.CV.CvEnum.BorderType.Replicate);
+                MIplImage mCopy = imgCopyPadded.MIplImage;
+                byte* dataPtrCopy = (byte*)mCopy.ImageData.ToPointer(); // Pointer to the image
+
+                int width = imgCopyPadded.Width;
+                int height = imgCopyPadded.Height;
+                int nChan = m.NChannels; // number of channels - 3
+                int padding = m.WidthStep - m.NChannels * m.Width; // alingnment bytes (padding)
+                int widthStep = mCopy.WidthStep;
+
+                int x, y;
+                byte maxB, maxG, maxR;
+
+                for (y = halfDim; y < height - halfDim; y++)
+                {
+                    for (x = halfDim; x < width - halfDim; x++)
+                    {
+                        maxB = maxG = maxR = 0;
+                        foreach ((int, int) point in relativePoints)
+                        {
+                            int xPoint = x + point.Item1;
+                            int yPoint = y + point.Item2;
+
+                            byte* dataPtrAux = dataPtrCopy + yPoint * widthStep + xPoint * nChan;
+
+                            if (dataPtrAux[0] > maxB)
+                            {
+                                maxB = dataPtrAux[0];
+                            }
+
+                            if (dataPtrAux[1] > maxG)
+                            {
+                                maxG = dataPtrAux[1];
+                            }
+
+                            if (dataPtrAux[2] > maxR)
+                            {
+                                maxR = dataPtrAux[2];
+                            }
+                        }
+                        
+                        dataPtr[0] = maxB;
+                        dataPtr[1] = maxG;
+                        dataPtr[2] = maxR;            
+                        
+
+                        // advance the pointer to the next pixel
+                        dataPtr += nChan;
+                    }
+
+                    //at the end of the line advance the pointer by the alignment bytes (padding)
+                    dataPtr += padding;
+                }
+                
+            }
+        }
+
+        /// <summary>
+        /// Erodes image. Eroding means replacing each pixel's intensity with the lowest intensity of its neighbors (according to the binary mask).
+        /// </summary>
+        /// <param name="img"></param>
+        /// <param name="mask"></param>
+        public static void Erosion(Image<Bgr, byte> img, bool[,] mask)
+        {
+            if (mask.GetLength(0) % 2 == 0 || mask.GetLength(1) % 2 == 0)
+            {
+                throw new ArgumentException("Mask dimensions must be odd");
+            }
+
+            if (mask.GetLength(0) != mask.GetLength(1))
+            {
+                throw new ArgumentException("Mask must be square");
+            }
+
+            HashSet<(int, int)> relativePoints = GetRelativePoints(mask);
+
+            unsafe
+            {
+                MIplImage m = img.MIplImage;
+                byte* dataPtr = (byte*)m.ImageData.ToPointer();
+
+                int halfDim = mask.GetLength(0) / 2;
+
+                Image<Bgr, byte> imgCopyPadded = new Image<Bgr, Byte>(img.Width + halfDim * 2, img.Height + halfDim * 2);
+                // Pad the copy image using OpenCV
+                CvInvoke.CopyMakeBorder(img, imgCopyPadded, halfDim, halfDim, halfDim, halfDim, Emgu.CV.CvEnum.BorderType.Replicate);
+                MIplImage mCopy = imgCopyPadded.MIplImage;
+                byte* dataPtrCopy = (byte*)mCopy.ImageData.ToPointer(); // Pointer to the image
+
+                int width = imgCopyPadded.Width;
+                int height = imgCopyPadded.Height;
+                int nChan = m.NChannels; // number of channels - 3
+                int padding = m.WidthStep - m.NChannels * m.Width; // alingnment bytes (padding)
+                int widthStep = mCopy.WidthStep;
+
+                int x, y;
+                byte minB, minG, minR;
+
+                for (y = halfDim; y < height - halfDim; y++)
+                {
+                    for (x = halfDim; x < width - halfDim; x++)
+                    {
+                        minB = minG = minR = 255;
+                        foreach ((int, int) point in relativePoints)
+                        {
+                            int xPoint = x + point.Item1;
+                            int yPoint = y + point.Item2;
+
+                            byte* dataPtrAux = dataPtrCopy + yPoint * widthStep + xPoint * nChan;
+
+                            if (dataPtrAux[0] < minB)
+                            {
+                                minB = dataPtrAux[0];
+                            }
+
+                            if (dataPtrAux[1] < minG)
+                            {
+                                minG = dataPtrAux[1];
+                            }
+
+                            if (dataPtrAux[2] < minR)
+                            {
+                                minR = dataPtrAux[2];
+                            }
+                        }
+
+                        dataPtr[0] = minB;
+                        dataPtr[1] = minG;
+                        dataPtr[2] = minR;
+
+
+                        // advance the pointer to the next pixel
+                        dataPtr += nChan;
+                    }
+
+                    //at the end of the line advance the pointer by the alignment bytes (padding)
+                    dataPtr += padding;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Performs an opening. Opening is just another name of erosion followed by dilation. It is useful in removing noise.
+        /// </summary>
+        /// <param name="img"></param>
+        /// <param name="mask"></param>
+        public static void Opening(Image<Bgr, byte> img, bool[,] mask)
+        {
+            Erosion(img, mask);
+            Dilation(img, mask);
+        }
+
+        /// <summary>
+        /// Closing is reverse of Opening, Dilation followed by Erosion. It is useful in closing small holes inside the foreground objects, or small black points on the object.
+        /// </summary>
+        /// <param name="img"></param>
+        /// <param name="mask"></param>
+        public static void Closing(Image<Bgr, byte> img, bool[,] mask)
+        {
+            Dilation(img, mask);
+            Erosion(img, mask);
+        }
+
 
         /// <summary>
         /// Sinal Reader
@@ -2702,6 +2894,95 @@ namespace SS_OpenCV
                 }
                 dataPtr += padding;
             }
+        }
+        /**
+        public static void ConnectedComponents(Image<Bgr, byte> img)
+        {
+            unsafe
+            {
+                BinarizeOnRed(img);
+
+                MIplImage m = img.MIplImage;
+                byte* dataPtr = (byte*)m.ImageData.ToPointer();
+
+                int width = img.Width;
+                int height = img.Height;
+                int nChan = m.NChannels;
+                int padding = m.WidthStep - m.NChannels * m.Width;
+                int widthStep = m.WidthStep;
+                int x, y;
+                bool propagating = true;
+
+                int[] labeledImage = new int[img.Width * img.Height];
+                int* labeledImagePtr = (int*)Unsafe.AsPointer(ref labeledImage[0]);
+                int* labeledImagePtrAux = labeledImagePtr;
+                int currentLabel = 1;
+
+                byte* dataPtrAux = dataPtr;
+
+                // First pass
+                for (y = 0; y < height; y++)
+                {
+                    for (x = 0; x < width; x++)
+                    {
+                        if (dataPtrAux[0] == 255 && dataPtrAux[1] == 255 && dataPtrAux[2] == 255)
+                            labeledImagePtrAux[0] = currentLabel++;
+
+                        // advance the pointer to the next pixel
+                        dataPtrAux += nChan;
+                        labeledImagePtrAux++;
+                    }
+                    //at the end of the line advance the pointer by the alignment bytes (padding)
+                    dataPtrAux += padding;
+                }
+
+                while (propagating)
+                {
+                    propagating = false;
+
+                    for (y = 0; y < height; y++)
+                    {
+                        for (x = 0; x < width; x++)
+                        {
+                            // convert to gray
+                            binary = Math.Round((dataPtr[0] + dataPtr[1] + dataPtr[2]) / 3.0) > threshold ? (byte)255 : (byte)0;
+
+                            // store in the image
+                            dataPtr[0] = binary;
+                            dataPtr[1] = binary;
+                            dataPtr[2] = binary;
+
+                            // advance the pointer to the next pixel
+                            dataPtr += nChan;
+                        }
+
+                        //at the end of the line advance the pointer by the alignment bytes (padding)
+                        dataPtr += padding;
+                    }
+
+                }      
+            }
+        }*/
+
+        private static HashSet<(int, int)> GetRelativePoints(bool[,] mask)
+        {
+            int nRows = mask.GetLength(0);
+            int nCols = mask.GetLength(1);
+
+            HashSet<(int, int)> hops = new HashSet<(int, int)>(); // Hops from the center point to the mask points that are 1
+            for (int i = 0; i < nRows; i++)
+            {
+                for (int j = 0; j < nCols; j++)
+                {
+                    if (mask[i, j])
+                    {
+                        int horizontalHop = j - nCols / 2;
+                        int verticalHop = i - nRows / 2;
+                        hops.Add((horizontalHop, verticalHop));
+                    }
+                }
+            }
+            return hops;
         }
 
         public static void MeanSolutionAPadding(Image<Bgr, byte> img, int dim)
