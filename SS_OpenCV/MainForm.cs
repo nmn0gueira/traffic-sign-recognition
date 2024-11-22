@@ -906,7 +906,6 @@ namespace SS_OpenCV
 
             Image<Bgr, byte> imgCopy1 = img.Copy();
             Image<Bgr, byte> imgCopy2 = img.Copy();
-
             ImageClass.BinarizeOnRed(img);
             //CvInvoke.ConnectedComponentsWithStats(img.Convert<B, byte>(), imgUndo, imgCopy1, imgCopy2);
 

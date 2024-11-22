@@ -7,9 +7,13 @@ using ResultsDLL;
 using Emgu.CV.CvEnum;
 using System.Data;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using System.Net.NetworkInformation;
 
 namespace SS_OpenCV
 {
+    public enum LineType { FourConnected, EightConnected };
+
     class ImageClass
     {
 
@@ -2522,6 +2526,97 @@ namespace SS_OpenCV
             Erosion(img, mask);
         }
 
+        
+        public static void ConnectedComponents(Image<Bgr, byte> img, LineType connectivity = LineType.EightConnected)
+        {
+            bool[,] mask;
+            HashSet<(int, int)> relativePoints;
+
+            switch (connectivity)
+            {
+                case LineType.EightConnected:
+                    mask = new bool[3, 3] { { true, true, true }, { true, false, true }, { true, true, true } };
+                    relativePoints = GetRelativePoints(mask);
+                    break;
+                case LineType.FourConnected:
+                    mask = new bool[3, 3] { { false, true, true }, { true, false, true }, { false, true, false } };
+                    relativePoints = GetRelativePoints(mask);
+                    break;
+                default:
+                    throw new ArgumentException("Invalid connectivity type"); // Should never happen
+            }
+
+            unsafe
+            {
+                MIplImage m = img.MIplImage;
+                byte* dataPtr = (byte*)m.ImageData.ToPointer();
+                byte* dataPtrAux = dataPtr;
+
+                int width = img.Width;
+                int height = img.Height;
+                int nChan = m.NChannels; // number of channels - 3
+                int padding = m.WidthStep - m.NChannels * m.Width; // alingnment bytes (padding)
+                int widthStep = m.WidthStep;
+                int x, y;
+
+                int labeledImageWidth = width + 2;
+                int labeledImageHeight = height + 2;
+                int[] labeledImage = new int[labeledImageWidth * labeledImageHeight]; // Pad image with 1 pixel border
+                int* labeledImagePtr = (int*)Unsafe.AsPointer(ref labeledImage[0]);
+                int* labeledImagePtrAux = labeledImagePtr + width + 3; // Skip the first row and the first column
+                int currentLabel = 1;
+                int minLabel;
+                
+
+                // First pass (assign labels to each non-null pixel)
+                for (y = 0; y < height; y++)
+                {
+                    for (x = 0; x < width; x++)
+                    {
+                        if (dataPtrAux[0] == 255 && dataPtrAux[1] == 255 && dataPtrAux[2] == 255)
+                            labeledImagePtrAux[0] = currentLabel++;
+
+                        // advance the pointer to the next pixel
+                        dataPtrAux += nChan;
+                        labeledImagePtrAux++;
+                    }
+                    labeledImagePtrAux += 2;
+                    //at the end of the line advance the pointer by the alignment bytes (padding)
+                    dataPtrAux += padding;
+                }
+
+                // Second pass (propagate labels top-down/left-right)
+                for (y = 1; y < labeledImageWidth - 1; y++)
+                {
+                    for (x = 1; x < labeledImageHeight - 1; x++)
+                    {
+                        minLabel = int.MaxValue;
+
+                        foreach ((int, int) point in relativePoints)
+                        {
+                            int xPoint = x + point.Item1;
+                            int yPoint = y + point.Item2;
+
+                            labeledImagePtrAux = labeledImagePtr + yPoint * widthStep + xPoint * nChan;
+
+                            if (labeledImagePtrAux[0] != 0)
+                            {
+                                if (labeledImagePtrAux[0] < minLabel)
+                                {
+                                    minLabel = labeledImagePtrAux[0];
+                                }
+                            }
+
+                        }
+
+                        labeledImagePtrAux++;
+                    }
+                }
+
+
+            }
+        }
+
 
         /// <summary>
         /// Sinal Reader
@@ -2894,75 +2989,7 @@ namespace SS_OpenCV
                 }
                 dataPtr += padding;
             }
-        }
-        /**
-        public static void ConnectedComponents(Image<Bgr, byte> img)
-        {
-            unsafe
-            {
-                BinarizeOnRed(img);
-
-                MIplImage m = img.MIplImage;
-                byte* dataPtr = (byte*)m.ImageData.ToPointer();
-
-                int width = img.Width;
-                int height = img.Height;
-                int nChan = m.NChannels;
-                int padding = m.WidthStep - m.NChannels * m.Width;
-                int widthStep = m.WidthStep;
-                int x, y;
-                bool propagating = true;
-
-                int[] labeledImage = new int[img.Width * img.Height];
-                int* labeledImagePtr = (int*)Unsafe.AsPointer(ref labeledImage[0]);
-                int* labeledImagePtrAux = labeledImagePtr;
-                int currentLabel = 1;
-
-                byte* dataPtrAux = dataPtr;
-
-                // First pass
-                for (y = 0; y < height; y++)
-                {
-                    for (x = 0; x < width; x++)
-                    {
-                        if (dataPtrAux[0] == 255 && dataPtrAux[1] == 255 && dataPtrAux[2] == 255)
-                            labeledImagePtrAux[0] = currentLabel++;
-
-                        // advance the pointer to the next pixel
-                        dataPtrAux += nChan;
-                        labeledImagePtrAux++;
-                    }
-                    //at the end of the line advance the pointer by the alignment bytes (padding)
-                    dataPtrAux += padding;
-                }
-
-                while (propagating)
-                {
-                    propagating = false;
-
-                    for (y = 0; y < height; y++)
-                    {
-                        for (x = 0; x < width; x++)
-                        {
-                            // convert to gray
-                            binary = Math.Round((dataPtr[0] + dataPtr[1] + dataPtr[2]) / 3.0) > threshold ? (byte)255 : (byte)0;
-
-                            // store in the image
-                            dataPtr[0] = binary;
-                            dataPtr[1] = binary;
-                            dataPtr[2] = binary;
-
-                            // advance the pointer to the next pixel
-                            dataPtr += nChan;
-                        }
-
-                        //at the end of the line advance the pointer by the alignment bytes (padding)
-                        dataPtr += padding;
-                    }
-
-                }      
-            }
-        }*/
+        }        
 
         private static HashSet<(int, int)> GetRelativePoints(bool[,] mask)
         {
