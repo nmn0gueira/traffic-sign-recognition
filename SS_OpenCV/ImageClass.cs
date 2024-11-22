@@ -9,10 +9,36 @@ using System.Data;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Net.NetworkInformation;
+using System.Linq;
 
 namespace SS_OpenCV
 {
     public enum LineType { FourConnected, EightConnected };
+
+    class UnionFind
+    {
+        private Dictionary<int, int> parent = new Dictionary<int, int>();
+
+        public int Find(int x)
+        {
+            if (!parent.ContainsKey(x)) parent[x] = x;
+            if (parent[x] != x) parent[x] = Find(parent[x]);
+            return parent[x];
+        }
+
+        public void Union(int x, int y)
+        {
+            int rootX = Find(x);
+            int rootY = Find(y);
+            if (rootX != rootY) parent[rootY] = rootX;
+        }
+
+        public List<int> GetDistinctRoots()
+        {
+            return parent.Keys.Select(Find).Distinct().ToList();
+        }
+    }
+
 
     class ImageClass
     {
@@ -2527,7 +2553,7 @@ namespace SS_OpenCV
         }
 
         
-        public static void ConnectedComponents(Image<Bgr, byte> img, LineType connectivity = LineType.EightConnected)
+        public static int[,] ConnectedComponents(Image<Bgr, byte> img, LineType connectivity = LineType.EightConnected)
         {
             bool[,] mask;
             HashSet<(int, int)> relativePoints;
@@ -2539,7 +2565,7 @@ namespace SS_OpenCV
                     relativePoints = GetRelativePoints(mask);
                     break;
                 case LineType.FourConnected:
-                    mask = new bool[3, 3] { { false, true, true }, { true, false, true }, { false, true, false } };
+                    mask = new bool[3, 3] { { false, true, false }, { true, false, true }, { false, true, false } };
                     relativePoints = GetRelativePoints(mask);
                     break;
                 default:
@@ -2561,60 +2587,135 @@ namespace SS_OpenCV
 
                 int labeledImageWidth = width + 2;
                 int labeledImageHeight = height + 2;
-                int[] labeledImage = new int[labeledImageWidth * labeledImageHeight]; // Pad image with 1 pixel border
-                int* labeledImagePtr = (int*)Unsafe.AsPointer(ref labeledImage[0]);
-                int* labeledImagePtrAux = labeledImagePtr + width + 3; // Skip the first row and the first column
+                int[,] labeledImage = new int[labeledImageHeight, labeledImageWidth];
                 int currentLabel = 1;
-                int minLabel;
-                
+
 
                 // First pass (assign labels to each non-null pixel)
-                for (y = 0; y < height; y++)
+                for (y = 1; y < labeledImageHeight - 1; y++)
                 {
-                    for (x = 0; x < width; x++)
+                    for (x = 1; x < labeledImageWidth - 1; x++)
                     {
                         if (dataPtrAux[0] == 255 && dataPtrAux[1] == 255 && dataPtrAux[2] == 255)
-                            labeledImagePtrAux[0] = currentLabel++;
+                            labeledImage[y, x] = currentLabel++;
 
                         // advance the pointer to the next pixel
                         dataPtrAux += nChan;
-                        labeledImagePtrAux++;
                     }
-                    labeledImagePtrAux += 2;
                     //at the end of the line advance the pointer by the alignment bytes (padding)
                     dataPtrAux += padding;
                 }
 
+                Dictionary<int, int> equivalenceTable = new Dictionary<int, int>();
+
                 // Second pass (propagate labels top-down/left-right)
-                for (y = 1; y < labeledImageWidth - 1; y++)
+                for (y = 1; y < labeledImageHeight - 1; y++)
                 {
-                    for (x = 1; x < labeledImageHeight - 1; x++)
+                    for (x = 1; x < labeledImageWidth - 1; x++)
                     {
-                        minLabel = int.MaxValue;
-
-                        foreach ((int, int) point in relativePoints)
+                        if (labeledImage[y, x] != 0) // Non-zero label
                         {
-                            int xPoint = x + point.Item1;
-                            int yPoint = y + point.Item2;
+                            int minLabel = int.MaxValue;
+                            List<int> neighborLabels = new List<int>();
 
-                            labeledImagePtrAux = labeledImagePtr + yPoint * widthStep + xPoint * nChan;
-
-                            if (labeledImagePtrAux[0] != 0)
+                            // Find the smallest label among the neighbors
+                            foreach ((int dx, int dy) in relativePoints)
                             {
-                                if (labeledImagePtrAux[0] < minLabel)
+                                
+                                int neighborLabel = labeledImage[y + dy, x + dx];
+                                if (neighborLabel > 0)
                                 {
-                                    minLabel = labeledImagePtrAux[0];
+
+                                    if (neighborLabel < minLabel)
+                                    {
+                                        minLabel = neighborLabel;
+                                    }
+
+                                    neighborLabels.Add(neighborLabel);
+                                }                       
+                            }
+
+                            // For each neighbor, add the label to the equivalence table
+                            foreach (int neighborLabel in neighborLabels)
+                            {
+                                if (neighborLabel != minLabel)
+                                {
+                                    equivalenceTable[neighborLabel] = minLabel;
                                 }
                             }
 
+                            labeledImage[y, x] = minLabel; // Propagate the smallest label
                         }
-
-                        labeledImagePtrAux++;
                     }
                 }
 
+                // Third pass (replace labels with the smallest equivalent label)
+                for (y = 1; y < labeledImageHeight - 1; y++)
+                {
+                    for (x = 1; x < labeledImageWidth - 1; x++)
+                    {
+                        int label = labeledImage[y, x];
 
-            }
+                        if (label != 0)
+                        {
+                            while (equivalenceTable.TryGetValue(label, out int equivalentLabel))
+                            {
+                                label = equivalentLabel;
+                            }
+                            labeledImage[y, x] = label;
+                        }
+                    }
+                }
+
+                // Get random colors for each label
+                Dictionary<int, Bgr> colors = new Dictionary<int, Bgr>();
+                List<int> labelList = equivalenceTable.Values.Distinct().ToList();
+                Random random = new Random();
+
+                foreach (int i in labelList)
+                {
+                    int blue, green, red;
+                    do {
+
+                        blue = random.Next(0, 256);
+                        green = random.Next(0, 256);
+                        red = random.Next(0, 256);
+
+                    } while (blue < 100 && green < 100 && red < 100); // Until a more contrasting color is generated
+                    
+                    colors[i] = new Bgr(blue, green ,red);
+                }
+
+                // Assign different colors to different labels
+                for (y = 1; y < labeledImageHeight - 1; y++)
+                {
+                    for (x = 1; x < labeledImageWidth - 1; x++)
+                    {
+                        int label = labeledImage[y, x];
+                        if (label != 0)
+                        {
+                            Bgr color = colors[label];
+                            dataPtr[0] = (byte)color.Blue;
+                            dataPtr[1] = (byte)color.Green;
+                            dataPtr[2] = (byte)color.Red;
+                        }
+                        else
+                        {
+                            dataPtr[0] = 0;
+                            dataPtr[1] = 0;
+                            dataPtr[2] = 0;
+                        }
+
+                        // advance the pointer to the next pixel
+                        dataPtr += nChan;
+                    }
+
+                    //at the end of the line advance the pointer by the alignment bytes (padding)
+                    dataPtr += padding;
+                }
+
+                return labeledImage;
+            }            
         }
 
 
