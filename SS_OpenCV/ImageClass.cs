@@ -2571,14 +2571,234 @@ namespace SS_OpenCV
             Erosion(img, mask);
         }
 
-        
         /// <summary>
         /// Executes the classic version of the connected components algorithm on a (supposedly) binary image. Different objects are marked with different colors in the final result.
         /// </summary>
         /// <param name="img">Input image</param>
         /// <param name="connectivity">Defines adjacency pixels to take into consideration (4 or 8)</param>
         /// <exception cref="ArgumentException"></exception>
-        public static void ConnectedComponents(Image<Bgr, byte> img, LineType connectivity = LineType.EightConnected)
+        public static unsafe void ConnectedComponents(Image<Bgr, byte> img, LineType connectivity = LineType.EightConnected)
+        {
+            bool[,] mask;
+            HashSet<(int, int)> relativePoints;
+
+            switch (connectivity)
+            {
+                case LineType.EightConnected:
+                    mask = new bool[3, 3] { { true, true, true }, { true, false, true }, { true, true, true } };
+                    relativePoints = GetRelativePoints(mask);
+                    break;
+                case LineType.FourConnected:
+                    mask = new bool[3, 3] { { false, true, false }, { true, false, true }, { false, true, false } };
+                    relativePoints = GetRelativePoints(mask);
+                    break;
+                default:
+                    throw new ArgumentException("Invalid connectivity type"); // Should never happen
+            }
+
+            
+            MIplImage m = img.MIplImage;
+            byte* dataPtr = (byte*)m.ImageData.ToPointer();
+            byte* dataPtrAux = dataPtr;
+
+            int width = img.Width;
+            int height = img.Height;
+            int nChan = m.NChannels; // number of channels - 3
+            int padding = m.WidthStep - m.NChannels * m.Width; // alingnment bytes (padding)
+            int widthStep = m.WidthStep;
+
+            int[,] labeledImage = new int[height, width];
+            int currentLabel = 1;
+
+            UnionFind equivalenceTree = new UnionFind();
+            Dictionary<int, (int xMin, int yMin, int xMax, int yMax)> boundingBoxes = new Dictionary<int, (int, int, int, int)>();
+
+
+            void PropagateLabel(int x, int y, HashSet<(int, int)> validPoints)
+            {
+                if (labeledImage[y, x] != 0) // Non-zero label
+                {
+                    int minLabel = int.MaxValue;
+                    List<int> neighborLabels = new List<int>();
+
+                    // Find the smallest label among the neighbors
+                    foreach ((int dx, int dy) in validPoints)
+                    {
+                        int neighborLabel = labeledImage[y + dy, x + dx];
+                        if (neighborLabel > 0)
+                        {
+                            if (neighborLabel < minLabel)
+                            {
+                                minLabel = neighborLabel;
+                            }
+                            neighborLabels.Add(neighborLabel);
+                        }
+                    }
+
+                    // For each neighbor, add the label to the equivalence table
+                    foreach (int neighborLabel in neighborLabels)
+                    {
+                        if (neighborLabel != minLabel)
+                        {
+                            equivalenceTree.Union(neighborLabel, minLabel);
+                        }
+                    }
+
+                    labeledImage[y, x] = minLabel; // Propagate the smallest label
+                }
+            }
+
+
+            // Assign labels to each non-null pixel
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    if (dataPtrAux[0] == 255 && dataPtrAux[1] == 255 && dataPtrAux[2] == 255)
+                        labeledImage[y, x] = currentLabel++;
+
+                    // advance the pointer to the next pixel
+                    dataPtrAux += nChan;
+                }
+                //at the end of the line advance the pointer by the alignment bytes (padding)
+                dataPtrAux += padding;
+            }
+
+            HashSet<(int, int)> topBorderNeighbors = relativePoints.Where(point => point.Item2 > -1).ToHashSet();
+            HashSet<(int, int)> upperLeftCornerNeigbors = topBorderNeighbors.Where(point => point.Item1 > -1).ToHashSet();
+            HashSet<(int, int)> upperRightCornerNeigbors = topBorderNeighbors.Where(point => point.Item1 < 1).ToHashSet();
+
+            HashSet<(int, int)> leftBorderNeighbors = relativePoints.Where(point => point.Item1 > -1).ToHashSet();
+            HashSet<(int, int)> rightBorderNeighbors = relativePoints.Where(point => point.Item1 < 1).ToHashSet();
+
+            HashSet<(int, int)> bottomBorderNeighbors = relativePoints.Where(point => point.Item2 < 1).ToHashSet();
+            HashSet<(int, int)> bottomLeftCornerNeighbors = bottomBorderNeighbors.Where(point => point.Item1 > -1).ToHashSet();
+            HashSet<(int, int)> bottomRightCornerNeighbors = bottomBorderNeighbors.Where(point => point.Item1 < 1).ToHashSet();
+
+
+            // First pass (propagate labels top-down/left-right)
+            // Treat top border
+            PropagateLabel(0, 0, upperLeftCornerNeigbors);
+            for (int x = 1; x < width - 1; x++)
+            {
+                PropagateLabel(x, 0, topBorderNeighbors);
+            }
+            PropagateLabel(width - 1, 0, upperRightCornerNeigbors);
+
+            // Treat core
+            for (int y = 1; y < height - 1; y++)
+            {
+                // Treat left border pixels before the rest
+                PropagateLabel(0, y, leftBorderNeighbors);
+                
+                for (int x = 1; x < width - 1; x++)
+                {
+                    PropagateLabel(x, y, relativePoints);                 
+                }
+
+                // Treat right border pixels after the previous
+                PropagateLabel(width - 1, y, rightBorderNeighbors);
+            }
+
+            // Treat bottom border
+            PropagateLabel(0, height - 1, bottomLeftCornerNeighbors);
+            for (int x = 1; x < width - 1; x++)
+            {
+                PropagateLabel(x, height - 1, bottomBorderNeighbors);
+            }
+            PropagateLabel(width - 1, height - 1, bottomRightCornerNeighbors);
+
+
+            // Second pass (trasitive closing with equivalence table)
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int label = labeledImage[y, x];
+
+                    if (label != 0)
+                    {
+                        labeledImage[y, x] = equivalenceTree.Find(label);
+
+                        // If bounding box was already established, potentially expand it further
+                        if (boundingBoxes.TryGetValue(label, out var box))
+                        {
+                            boundingBoxes[label] = (
+                                Math.Min(box.xMin, x),
+                                Math.Min(box.yMin, y),
+                                Math.Max(box.xMax, x),
+                                Math.Max(box.yMax, y)
+                            );
+                        }
+                        // Otherwise, create bounding box for this label
+                        else
+                        {
+                            boundingBoxes[label] = (x, y, x, y);
+                        }
+                    }
+                }
+            }
+
+            // Get random colors for each label
+            Dictionary<int, Bgr> colors = new Dictionary<int, Bgr>();
+            List<int> labelList = equivalenceTree.GetDistinctRoots();
+            Random random = new Random();
+
+            foreach (int i in labelList)
+            {
+                double hue = random.NextDouble() * 360;
+                double saturation = 0.7; // Fixed saturation
+                double lightness = 0.5 + random.NextDouble() * 0.3; // Moderate brightness
+                colors[i] = HslToBgr(hue, saturation, lightness);
+                /*
+                int blue, green, red;
+                do {
+
+                    blue = random.Next(0, 256);
+                    green = random.Next(0, 256);
+                    red = random.Next(0, 256);
+
+                } while (blue < 100 && green < 100 && red < 100); // Until a more contrasting color is generated
+                    
+                colors[i] = new Bgr(blue, green ,red);*/
+            }
+
+            // Assign different colors to different labels
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int label = labeledImage[y, x];
+                    if (label != 0)
+                    {
+                        Bgr color = colors[label];
+                        dataPtr[0] = (byte)color.Blue;
+                        dataPtr[1] = (byte)color.Green;
+                        dataPtr[2] = (byte)color.Red;
+                    }
+                    else
+                    {
+                        dataPtr[0] = 0;
+                        dataPtr[1] = 0;
+                        dataPtr[2] = 0;
+                    }
+
+                    dataPtr += nChan;
+                }
+
+                dataPtr += padding;
+            }
+            
+        }
+
+
+        /// <summary>
+        /// Executes the classic version of the connected components algorithm on a (supposedly) binary image. Different objects are marked with different colors in the final result.
+        /// </summary>
+        /// <param name="img">Input image</param>
+        /// <param name="connectivity">Defines adjacency pixels to take into consideration (4 or 8)</param>
+        /// <exception cref="ArgumentException"></exception>
+        public static void ConnectedComponents2(Image<Bgr, byte> img, LineType connectivity = LineType.EightConnected)
         {
             bool[,] mask;
             HashSet<(int, int)> relativePoints;
@@ -2612,7 +2832,7 @@ namespace SS_OpenCV
 
                 int labeledImageWidth = width + 2;
                 int labeledImageHeight = height + 2;
-                int[,] labeledImage = new int[labeledImageHeight, labeledImageWidth];
+                int[,] labeledImage = new int[labeledImageHeight, labeledImageWidth]; // Labeled image is padded
                 int currentLabel = 1;
 
 
@@ -2673,6 +2893,8 @@ namespace SS_OpenCV
                     }
                 }
 
+                Dictionary<int, (int xMin, int yMin, int xMax, int yMax)> boundingBoxes = new Dictionary<int, (int, int, int, int)>();
+
                 // Second pass (trasitive closing with equivalence table)
                 for (y = 1; y < labeledImageHeight - 1; y++)
                 {
@@ -2683,6 +2905,22 @@ namespace SS_OpenCV
                         if (label != 0)
                         {                        
                             labeledImage[y, x] = equivalenceTree.Find(label);
+
+                            // If bounding box was already established, potentially expand it further
+                            if (boundingBoxes.TryGetValue(label, out var box))
+                            {
+                                boundingBoxes[label] = (
+                                    Math.Min(box.xMin, x),
+                                    Math.Min(box.yMin, y),
+                                    Math.Max(box.xMax, x),
+                                    Math.Max(box.yMax, y)
+                                );
+                            }
+                            // Otherwise, create bounding box for this label
+                            else
+                            {
+                                boundingBoxes[label] = (x, y, x, y);
+                            }
                         }
                     }
                 }
@@ -2750,7 +2988,7 @@ namespace SS_OpenCV
         public static void SinalReader(Image<Bgr, byte> imgDest, Image<Bgr, byte> imgOrig, int level, out Results sinalResult)
         {
 
-            /*switch (level)
+            switch (level)
             {
                 case 1:
                     //SinalReaderLevel1(imgDest, imgOrig, out sinalResult);
@@ -2786,26 +3024,8 @@ namespace SS_OpenCV
             imgDest.Draw(sinal.sinalRect, new Bgr(Color.Green));
 
             // add sinal to results
-            sinalResult.results.Add(sinal);*/
+            sinalResult.results.Add(sinal);
             sinalResult = new Results();
-
-            // Put image in HSV color space
-            unsafe
-            {
-                MIplImage m = imgDest.MIplImage;
-                byte* dataPtr = (byte*)m.ImageData.ToPointer();
-                byte binary; // binary value of the pixel
-
-                int width = imgDest.Width;
-                int height = imgDest.Height;
-                int nChan = m.NChannels;
-                int padding = m.WidthStep - m.NChannels * m.Width;
-                int widthStep = m.WidthStep;
-                int x, y;
-                (int, byte) maxChannel;
-
-                
-            }
 
         }
 
