@@ -278,6 +278,23 @@ namespace SS_OpenCV
             Cursor = Cursors.Default; // normal cursor
         }
 
+        private void onRedToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
+
+            ImageClass.BinarizeOnRed(img);
+
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
+        }
+
         private void yCrCbToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (img == null) // verify if the image is already opened
@@ -287,7 +304,7 @@ namespace SS_OpenCV
             //copy Undo Image
             imgUndo = img.Copy();
 
-            ImageClass.ImageRGBtoYCrCb(img.MIplImage);
+            ImageClass.ImageBgrToYCrCb(img.MIplImage);
 
             ImageViewer.Image = img;
             ImageViewer.Refresh(); // refresh image on the screen
@@ -305,7 +322,7 @@ namespace SS_OpenCV
             imgUndo = img.Copy();
 
             //img.Convert<Hsv, byte>().CopyTo(img);
-            ImageClass.ImageRGBtoHSV(img);
+            ImageClass.ImageBgrToHsv(img);
 
             ImageViewer.Image = img;
             ImageViewer.Refresh(); // refresh image on the screen
@@ -893,43 +910,6 @@ namespace SS_OpenCV
 
                 mouseFlag = false;
             }
-        }
-
-        private void debugBinarizationToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            if (img == null) // verify if the image is already opened
-                return;
-            Cursor = Cursors.WaitCursor; // clock cursor 
-
-            //copy Undo Image
-            imgUndo = img.Copy();
-
-            ImageClass.BinarizeOnRed(img);
-
-            ImageViewer.Image = img;
-            ImageViewer.Refresh(); // refresh image on the screen
-
-            Cursor = Cursors.Default; // normal cursor
-        }
-
-        private void connectedCompDebugToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            if (img == null) // verify if the image is already opened
-                return;
-            Cursor = Cursors.WaitCursor; // clock cursor 
-
-            //copy Undo Image
-            imgUndo = img.Copy();
-
-            Image<Bgr, byte> imgCopy1 = img.Copy();
-            Image<Bgr, byte> imgCopy2 = img.Copy();
-            ImageClass.BinarizeOnRed(img);
-            //CvInvoke.ConnectedComponentsWithStats(img.Convert<B, byte>(), imgUndo, imgCopy1, imgCopy2);
-
-            ImageViewer.Image = img;
-            ImageViewer.Refresh(); // refresh image on the screen
-
-            Cursor = Cursors.Default; // normal cursor
         }
 
         private void ImageViewer_MouseMove(object sender, MouseEventArgs e)

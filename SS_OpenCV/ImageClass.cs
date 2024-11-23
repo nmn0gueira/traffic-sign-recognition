@@ -2253,7 +2253,7 @@ namespace SS_OpenCV
                 int padding = m.WidthStep - m.NChannels * m.Width;
                 int widthStep = m.WidthStep;
 
-                ImageRGBtoYCrCb(m);
+                ImageBgrToYCrCb(m);
 
                 // Obtain histogram on the Y value
                 int[] histogram = new int[256];
@@ -2294,7 +2294,7 @@ namespace SS_OpenCV
                     dataPtr += padding;
                 }
 
-                ImageYCrCbtoRGB(m);
+                ImageYCrCbToBgr(m);
                 //imgCopy.Convert<Bgr, byte>().CopyTo(img); // Convert modified YCrCb image back to BGR and copy it to the original image
             }
         }
@@ -2572,7 +2572,13 @@ namespace SS_OpenCV
         }
 
         
-        public static int[,] ConnectedComponents(Image<Bgr, byte> img, LineType connectivity = LineType.EightConnected)
+        /// <summary>
+        /// Executes the classic version of the connected components algorithm on a (supposedly) binary image. Different objects are marked with different colors in the final result.
+        /// </summary>
+        /// <param name="img">Input image</param>
+        /// <param name="connectivity">Defines adjacency pixels to take into consideration (4 or 8)</param>
+        /// <exception cref="ArgumentException"></exception>
+        public static void ConnectedComponents(Image<Bgr, byte> img, LineType connectivity = LineType.EightConnected)
         {
             bool[,] mask;
             HashSet<(int, int)> relativePoints;
@@ -2610,7 +2616,7 @@ namespace SS_OpenCV
                 int currentLabel = 1;
 
 
-                // First pass (assign labels to each non-null pixel)
+                // Assign labels to each non-null pixel
                 for (y = 1; y < labeledImageHeight - 1; y++)
                 {
                     for (x = 1; x < labeledImageWidth - 1; x++)
@@ -2625,9 +2631,9 @@ namespace SS_OpenCV
                     dataPtrAux += padding;
                 }
 
-                UnionFind equivalenceTable = new UnionFind();
+                UnionFind equivalenceTree = new UnionFind();
 
-                // Second pass (propagate labels top-down/left-right)
+                // First pass (propagate labels top-down/left-right)
                 for (y = 1; y < labeledImageHeight - 1; y++)
                 {
                     for (x = 1; x < labeledImageWidth - 1; x++)
@@ -2639,8 +2645,7 @@ namespace SS_OpenCV
 
                             // Find the smallest label among the neighbors
                             foreach ((int dx, int dy) in relativePoints)
-                            {
-                                
+                            {                              
                                 int neighborLabel = labeledImage[y + dy, x + dx];
                                 if (neighborLabel > 0)
                                 {
@@ -2659,7 +2664,7 @@ namespace SS_OpenCV
                             {
                                 if (neighborLabel != minLabel)
                                 {
-                                    equivalenceTable.Union(neighborLabel, minLabel);
+                                    equivalenceTree.Union(neighborLabel, minLabel);
                                 }
                             }
 
@@ -2668,7 +2673,7 @@ namespace SS_OpenCV
                     }
                 }
 
-                // Third pass (replace labels with the smallest equivalent label)
+                // Second pass (trasitive closing with equivalence table)
                 for (y = 1; y < labeledImageHeight - 1; y++)
                 {
                     for (x = 1; x < labeledImageWidth - 1; x++)
@@ -2677,18 +2682,23 @@ namespace SS_OpenCV
 
                         if (label != 0)
                         {                        
-                            labeledImage[y, x] = equivalenceTable.Find(label);
+                            labeledImage[y, x] = equivalenceTree.Find(label);
                         }
                     }
                 }
 
                 // Get random colors for each label
                 Dictionary<int, Bgr> colors = new Dictionary<int, Bgr>();
-                List<int> labelList = equivalenceTable.GetDistinctRoots();
+                List<int> labelList = equivalenceTree.GetDistinctRoots();
                 Random random = new Random();
 
                 foreach (int i in labelList)
                 {
+                    double hue = random.NextDouble() * 360;
+                    double saturation = 0.7; // Fixed saturation
+                    double lightness = 0.5 + random.NextDouble() * 0.3; // Moderate brightness
+                    colors[i] = HslToBgr(hue, saturation, lightness);
+                    /*
                     int blue, green, red;
                     do {
 
@@ -2698,7 +2708,7 @@ namespace SS_OpenCV
 
                     } while (blue < 100 && green < 100 && red < 100); // Until a more contrasting color is generated
                     
-                    colors[i] = new Bgr(blue, green ,red);
+                    colors[i] = new Bgr(blue, green ,red);*/
                 }
 
                 // Assign different colors to different labels
@@ -2721,15 +2731,11 @@ namespace SS_OpenCV
                             dataPtr[2] = 0;
                         }
 
-                        // advance the pointer to the next pixel
                         dataPtr += nChan;
                     }
 
-                    //at the end of the line advance the pointer by the alignment bytes (padding)
                     dataPtr += padding;
                 }
-
-                return labeledImage;
             }            
         }
 
@@ -2889,7 +2895,7 @@ namespace SS_OpenCV
             return a + (b-a) * delta;
         }
 
-        public static unsafe void ImageRGBtoYCrCb(MIplImage image)
+        public static unsafe void ImageBgrToYCrCb(MIplImage image)
         {
             byte* dataPtr = (byte*)image.ImageData.ToPointer();
 
@@ -2949,7 +2955,7 @@ namespace SS_OpenCV
             }
         }
 
-        private static unsafe void ImageYCrCbtoRGB(MIplImage image)
+        private static unsafe void ImageYCrCbToBgr(MIplImage image)
         {
             byte* dataPtr = (byte*)image.ImageData.ToPointer();
 
@@ -3009,7 +3015,7 @@ namespace SS_OpenCV
             }
         }
 
-        public static unsafe void ImageRGBtoHSV(Image<Bgr, byte> img)
+        public static unsafe void ImageBgrToHsv(Image<Bgr, byte> img)
         {
             MIplImage m = img.MIplImage;
             byte* dataPtr = (byte*)m.ImageData.ToPointer();
@@ -3068,7 +3074,7 @@ namespace SS_OpenCV
         /// <param name="img"></param> 
         public static unsafe void BinarizeOnRed(Image<Bgr, byte> img)
         {
-            ImageRGBtoHSV(img);
+            ImageBgrToHsv(img);
 
             MIplImage m = img.MIplImage;
             byte* dataPtr = (byte*)m.ImageData.ToPointer();
@@ -3253,6 +3259,63 @@ namespace SS_OpenCV
                 }
             }
         }
+
+        public static Bgr HslToBgr(double h, double s, double l)
+        {
+            // Ensure the hue is within 0 to 360 degrees
+            h = h % 360;
+
+            double c = (1 - Math.Abs(2 * l - 1)) * s; // Chroma
+            double x = c * (1 - Math.Abs((h / 60) % 2 - 1)); // Intermediate value
+            double m = l - c / 2; // Value to adjust brightness
+
+            double rPrime = 0, gPrime = 0, bPrime = 0;
+
+            if (h >= 0 && h < 60)
+            {
+                rPrime = c;
+                gPrime = x;
+                bPrime = 0;
+            }
+            else if (h >= 60 && h < 120)
+            {
+                rPrime = x;
+                gPrime = c;
+                bPrime = 0;
+            }
+            else if (h >= 120 && h < 180)
+            {
+                rPrime = 0;
+                gPrime = c;
+                bPrime = x;
+            }
+            else if (h >= 180 && h < 240)
+            {
+                rPrime = 0;
+                gPrime = x;
+                bPrime = c;
+            }
+            else if (h >= 240 && h < 300)
+            {
+                rPrime = x;
+                gPrime = 0;
+                bPrime = c;
+            }
+            else if (h >= 300 && h < 360)
+            {
+                rPrime = c;
+                gPrime = 0;
+                bPrime = x;
+            }
+
+            // Add m to adjust for lightness and return the values in the BGR range (0-255)
+            int b = (int)((bPrime + m) * 255);
+            int g = (int)((gPrime + m) * 255);
+            int r = (int)((rPrime + m) * 255);
+
+            return new Bgr(b, g, r); // Return BGR color
+        }
+
         // This version of Scale_Bilinear uses Parallel.For. It is much slower than the non-parallel version however.
         /*
         public static void Scale_Bilinear(Image<Bgr, byte> img, Image<Bgr, byte> imgCopy, float scaleFactor)
