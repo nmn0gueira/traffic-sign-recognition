@@ -15,17 +15,30 @@ namespace SS_OpenCV
 {
     public enum LineType { FourConnected, EightConnected };
 
+    /// <summary>
+    /// Union Find data structure used for more efficent implementation of the connected components algorithm
+    /// </summary>
     class UnionFind
     {
         private Dictionary<int, int> parent = new Dictionary<int, int>();
 
+        /// <summary>
+        /// Returns the root of element x adding it to the tree as a root if it did not exist. Path compression is used to minimize repeated Find calls.
+        /// </summary>
+        /// <param name="x">Element of the union find tree structure.</param>
+        /// <returns></returns>
         public int Find(int x)
         {
             if (!parent.ContainsKey(x)) parent[x] = x;
-            if (parent[x] != x) parent[x] = Find(parent[x]);
+            if (parent[x] != x) parent[x] = Find(parent[x]); // Path compression
             return parent[x];
         }
 
+        /// <summary>
+        /// Assigns x as root of y if x is not already its root.
+        /// </summary>
+        /// <param name="x">The element to be added as a child of y.</param>
+        /// <param name="y">New root of x.</param>
         public void Union(int x, int y)
         {
             int rootX = Find(x);
@@ -35,7 +48,13 @@ namespace SS_OpenCV
 
         public List<int> GetDistinctRoots()
         {
-            return parent.Keys.Select(Find).Distinct().ToList();
+            HashSet<int> roots = new HashSet<int>();
+            foreach (var label in parent.Keys)
+            {
+                if (label == parent[label])
+                    roots.Add(label);
+            }
+            return roots.ToList();
         }
     }
 
@@ -2606,7 +2625,7 @@ namespace SS_OpenCV
                     dataPtrAux += padding;
                 }
 
-                Dictionary<int, int> equivalenceTable = new Dictionary<int, int>();
+                UnionFind equivalenceTable = new UnionFind();
 
                 // Second pass (propagate labels top-down/left-right)
                 for (y = 1; y < labeledImageHeight - 1; y++)
@@ -2640,7 +2659,7 @@ namespace SS_OpenCV
                             {
                                 if (neighborLabel != minLabel)
                                 {
-                                    equivalenceTable[neighborLabel] = minLabel;
+                                    equivalenceTable.Union(neighborLabel, minLabel);
                                 }
                             }
 
@@ -2657,19 +2676,15 @@ namespace SS_OpenCV
                         int label = labeledImage[y, x];
 
                         if (label != 0)
-                        {
-                            while (equivalenceTable.TryGetValue(label, out int equivalentLabel))
-                            {
-                                label = equivalentLabel;
-                            }
-                            labeledImage[y, x] = label;
+                        {                        
+                            labeledImage[y, x] = equivalenceTable.Find(label);
                         }
                     }
                 }
 
                 // Get random colors for each label
                 Dictionary<int, Bgr> colors = new Dictionary<int, Bgr>();
-                List<int> labelList = equivalenceTable.Values.Distinct().ToList();
+                List<int> labelList = equivalenceTable.GetDistinctRoots();
                 Random random = new Random();
 
                 foreach (int i in labelList)
