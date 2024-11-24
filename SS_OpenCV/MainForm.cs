@@ -287,7 +287,15 @@ namespace SS_OpenCV
             //copy Undo Image
             imgUndo = img.Copy();
 
-            ImageClass.BinarizeOnRed(img);
+            /*
+             * These values restrict the ranges of red to those used in traffic signs. The hue range for the red color is 340-20 (170-10 in OpenCV), 
+             * the saturation and value would be adjusted in kind.
+             */
+            int hueLowerBound = 170, hueUpperBound = 5; // int hueLowerBound = 105, hueUpperBound = 135; // Blue hue, for example
+            int minSaturation = 150, maxSaturation = 255;
+            int minValue = 90, maxValue = 255; // previously, minValue was 50
+
+            ImageClass.BinarizeOnColor(img, hueLowerBound, hueUpperBound, minSaturation, maxSaturation, minValue, maxValue);
 
             ImageViewer.Image = img;
             ImageViewer.Refresh(); // refresh image on the screen
@@ -881,6 +889,23 @@ namespace SS_OpenCV
             imgUndo = img.Copy();
 
             ImageClass.ConnectedComponents(img);
+
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
+        }
+
+        private void sinalReaderToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
+
+            ImageClass.SinalReader(img, imgUndo, 0, out var sinalResult);
 
             ImageViewer.Image = img;
             ImageViewer.Refresh(); // refresh image on the screen
