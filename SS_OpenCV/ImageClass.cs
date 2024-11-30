@@ -7,6 +7,10 @@ using ResultsDLL;
 using Emgu.CV.CvEnum;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices.ComTypes;
+using System.Windows.Forms;
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
 
 namespace SS_OpenCV
 {
@@ -2576,7 +2580,7 @@ namespace SS_OpenCV
         /// <param name="connectivity">Defines adjacency pixels to take into consideration (4 or 8)</param>
         /// <returns>Dictionary that maps each label to their bounding box (xMin, yMin, xMax, yMax)</returns>
         /// <exception cref="ArgumentException"></exception>
-        public static unsafe Dictionary<int, (int, int, int, int)> ConnectedComponents(Image<Bgr, byte> img, LineType connectivity = LineType.EightConnected)
+        public static unsafe (int[,], Dictionary<int, (int, int, int, int)>) ConnectedComponents(Image<Bgr, byte> img, LineType connectivity = LineType.EightConnected)
         {
             bool[,] mask;
             IEnumerable<(int, int)> relativePoints;
@@ -2647,7 +2651,6 @@ namespace SS_OpenCV
                     labeledImage[y, x] = minLabel; // Propagate the smallest label
                 }
             }
-
 
             // Assign labels to each non-null pixel
             for (int y = 0; y < height; y++)
@@ -2781,7 +2784,133 @@ namespace SS_OpenCV
                 dataPtr += padding;
             }
 
-            return boundingBoxes;        
+            return (labeledImage, boundingBoxes);        
+        }
+
+        private static List<(int, int)> GetPerimeterPoints(int[,] labeledImage, int label, LineType connectivity = LineType.EightConnected)
+        {
+            bool[,] mask;
+            IEnumerable<(int, int)> relativePoints;
+
+            switch (connectivity)
+            {
+                case LineType.EightConnected:
+                    mask = new bool[3, 3] { { true, true, true }, { true, false, true }, { true, true, true } };
+                    relativePoints = GetRelativePoints(mask);
+                    break;
+                case LineType.FourConnected:
+                    mask = new bool[3, 3] { { false, true, false }, { true, false, true }, { false, true, false } };
+                    relativePoints = GetRelativePoints(mask);
+                    break;
+                default:
+                    throw new ArgumentException("Invalid connectivity type"); // Should never happen
+            }
+
+            List<(int, int)> points = new List<(int, int)>();
+            int height = labeledImage.GetLength(0);
+            int width = labeledImage.GetLength(1);
+
+            void ProcessPixel(int x, int y, IEnumerable<(int, int)> validPoints)
+            {
+                if (labeledImage[y, x] == label)
+                {
+                    // Find the smallest label among the neighbors
+                    foreach ((int dx, int dy) in validPoints)
+                    {
+                        int neighborLabel = labeledImage[y + dy, x + dx];
+
+                        // Only when a pixel is not in the interior of the object will a neighbor pixel have a different label
+                        if (neighborLabel != label)
+                        {
+                            points.Add((x, y));
+                        }
+                    }
+                }
+            }
+
+            IEnumerable<(int, int)> topBorderNeighbors = relativePoints.Where(point => point.Item2 > -1);
+            IEnumerable<(int, int)> upperLeftCornerNeigbors = topBorderNeighbors.Where(point => point.Item1 > -1);
+            IEnumerable<(int, int)> upperRightCornerNeigbors = topBorderNeighbors.Where(point => point.Item1 < 1);
+
+            IEnumerable<(int, int)> leftBorderNeighbors = relativePoints.Where(point => point.Item1 > -1);
+            IEnumerable<(int, int)> rightBorderNeighbors = relativePoints.Where(point => point.Item1 < 1);
+
+            IEnumerable<(int, int)> bottomBorderNeighbors = relativePoints.Where(point => point.Item2 < 1);
+            IEnumerable<(int, int)> bottomLeftCornerNeighbors = bottomBorderNeighbors.Where(point => point.Item1 > -1);
+            IEnumerable<(int, int)> bottomRightCornerNeighbors = bottomBorderNeighbors.Where(point => point.Item1 < 1);
+
+
+            // Extract only the perimeter points of an object
+            // Treat top border
+            ProcessPixel(0, 0, upperLeftCornerNeigbors);
+            for (int x = 1; x < width - 1; x++)
+            {
+                ProcessPixel(x, 0, topBorderNeighbors);
+            }
+            ProcessPixel(width - 1, 0, upperRightCornerNeigbors);
+
+            // Treat core
+            for (int y = 1; y < height - 1; y++)
+            {
+                // Treat left border pixels before the rest
+                ProcessPixel(0, y, leftBorderNeighbors);
+
+                for (int x = 1; x < width - 1; x++)
+                {
+                    ProcessPixel(x, y, relativePoints);
+                }
+
+                // Treat right border pixels after the previous
+                ProcessPixel(width - 1, y, rightBorderNeighbors);
+            }
+
+            // Treat bottom border
+            ProcessPixel(0, height - 1, bottomLeftCornerNeighbors);
+            for (int x = 1; x < width - 1; x++)
+            {
+                ProcessPixel(x, height - 1, bottomBorderNeighbors);
+            }
+            ProcessPixel(width - 1, height - 1, bottomRightCornerNeighbors);
+
+
+            return points;
+        }
+
+        private static List<(int, int)> JarvisMarch(int[,] labeledImage, int label, LineType connectivity = LineType.EightConnected)
+        {
+
+            List<(int, int)> perimeterPoints = GetPerimeterPoints(labeledImage, label, connectivity);
+            List<(int, int)> hullPoints = new List<(int, int)>();
+
+            (int, int) startPoint = perimeterPoints.Aggregate((min, current) => current.Item1 < min.Item1 ? current : min);
+            (int, int) currentPoint = startPoint;
+
+            bool IsCounterclockwise((int, int) p1, (int, int) p2, (int, int) p3)
+            {
+                return (p3.Item2 - p1.Item2) * (p2.Item1 - p1.Item1) - (p3.Item1 - p1.Item1) * (p2.Item2 - p1.Item2) > 0;
+            }
+
+            while (true)
+            {
+                hullPoints.Add(currentPoint);
+
+                (int, int) nextPoint = (-1, -1);
+
+                foreach ((int, int) candidatePoint in perimeterPoints)
+                {
+                    if (candidatePoint == currentPoint)
+                        continue;
+                    if (nextPoint == (-1, -1) || IsCounterclockwise(currentPoint, nextPoint, candidatePoint))
+                        nextPoint = candidatePoint;
+                }
+
+                currentPoint = nextPoint;
+                if (currentPoint == startPoint)
+                    break;
+
+            }
+
+            return hullPoints;
         }
 
 
@@ -2805,7 +2934,12 @@ namespace SS_OpenCV
 
             BinarizeOnColor(imgCopy, hueLowerBound, hueUpperBound, minSaturation, maxSaturation, minValue, maxValue);
             Opening(imgCopy, new bool[3, 3] { { true, true, true }, { true, true, true }, { true, true, true } });
-            Dictionary<int, (int xMin, int yMin, int xMax, int yMax)> boundingBoxes = ConnectedComponents(imgCopy);
+            (int[,] labeledImage, Dictionary<int, (int xMin, int yMin, int xMax, int yMax)> boundingBoxes) = ConnectedComponents(imgCopy);
+
+            foreach (int label in boundingBoxes.Keys)
+            {
+                
+            }
 
             // Draw boxes on identified objects
             foreach (var box in boundingBoxes.Values)
