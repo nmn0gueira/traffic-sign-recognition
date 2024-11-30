@@ -913,6 +913,63 @@ namespace SS_OpenCV
             Cursor = Cursors.Default; // normal cursor
         }
 
+        private void perimeterToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
+
+            List<ImageClass.ConnectedComponent> connectedComponents = ImageClass.ConnectedComponents(img, colorComponents: false);
+
+            ImageClass.DrawPerimeter(img, connectedComponents);
+
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
+        }
+
+        private void areaToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
+
+            List<ImageClass.ConnectedComponent> connectedComponents = ImageClass.ConnectedComponents(img, colorComponents: false);
+
+            ImageClass.DrawArea(img, connectedComponents);
+
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
+        }
+
+        private void hullPerimeterToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
+
+            List<ImageClass.ConnectedComponent> connectedComponents = ImageClass.ConnectedComponents(img, colorComponents: false);
+
+            ImageClass.DrawHullPerimeter(img, connectedComponents);
+
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
+        }
+
         private void sinalReaderToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (img == null) // verify if the image is already opened
