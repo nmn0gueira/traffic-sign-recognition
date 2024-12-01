@@ -310,7 +310,29 @@ namespace SS_OpenCV
              */
             int hueLowerBound = 170, hueUpperBound = 5; // int hueLowerBound = 105, hueUpperBound = 135; // Blue hue, for example
             int minSaturation = 150, maxSaturation = 255;
-            int minValue = 90, maxValue = 255; // previously, minValue was 50
+            int minValue = 70, maxValue = 255; // previously, minValue was 50
+
+            ImageClass.BinarizeOnColor(img, hueLowerBound, hueUpperBound, minSaturation, maxSaturation, minValue, maxValue);
+
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
+        }
+
+        private void onBlackToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
+
+
+            int hueLowerBound = 0, hueUpperBound = 180;
+            int minSaturation = 0, maxSaturation = 255;
+            int minValue = 0, maxValue = 51; // 20 % of max value
 
             ImageClass.BinarizeOnColor(img, hueLowerBound, hueUpperBound, minSaturation, maxSaturation, minValue, maxValue);
 
@@ -877,7 +899,7 @@ namespace SS_OpenCV
             Cursor = Cursors.Default; // normal cursor
         }
 
-        private void closureToolStripMenuItem_Click(object sender, EventArgs e)
+        private void closingToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (img == null) // verify if the image is already opened
                 return;
@@ -963,6 +985,25 @@ namespace SS_OpenCV
             List<ImageClass.ConnectedComponent> connectedComponents = ImageClass.ConnectedComponents(img, colorComponents: false);
 
             ImageClass.DrawHullPerimeter(img, connectedComponents);
+
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
+        }
+
+        private void hullAreaToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
+
+            List<ImageClass.ConnectedComponent> connectedComponents = ImageClass.ConnectedComponents(img, colorComponents: false);
+
+            ImageClass.DrawHullArea(img, connectedComponents);
 
             ImageViewer.Image = img;
             ImageViewer.Refresh(); // refresh image on the screen

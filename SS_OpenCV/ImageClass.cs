@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
 using System.ComponentModel;
+using System.IO;
 
 
 namespace SS_OpenCV
@@ -64,22 +65,20 @@ namespace SS_OpenCV
 
         public class ConnectedComponent
         {
-            public int Label { get; }
-            
-            public int Area { get; }
-
             private HashSet<(int, int)> _pixels;
             private Rectangle? _boundingBox = null;
             private (int, int)? _centroid = null;
-
             private double? _maxDiameter = null;
+            private double? _perimeter = null;
+            private List<int> _chainCode = new List<int>();
+            private HashSet<(int, int)> _perimeterPoints = new HashSet<(int, int)>();
+            private List<(int, int)> _hullExtremeties = new List<(int, int)>();
+            private HashSet<(int, int)> _hullPerimeterPoints = new HashSet<(int, int)>();
+            private List<(int, int)> _hullPoints = new List<(int, int)>();
+            
 
-            private double? _perimeter8C = null;
-            private double? _perimeter4C = null;
-            private HashSet<(int, int)> _perimeter8CPoints = new HashSet<(int, int)>();
-            private HashSet<(int, int)> _perimeter4CPoints = new HashSet<(int, int)>();
-            private List<(int, int)> _convexPerimeterPoints = new List<(int, int)>();
-
+            public int Label { get; }
+            public int Area { get; }
             public IReadOnlyCollection<(int, int)> Pixels => _pixels;
 
             public Rectangle BoundingBox
@@ -112,15 +111,68 @@ namespace SS_OpenCV
                 }
             }
 
+            public double Perimeter
+            {
+                get
+                {
+                    if (_perimeter == null)
+                        _perimeter = GetPerimeter();
+                    return _perimeter.Value;
+                }
+            }
+
+            public List<int> ChainCode
+            {
+                get
+                {
+                    if (_chainCode.Count == 0)
+                        _chainCode = GetChainCode(PerimeterPoints);
+                    return _chainCode;
+                }
+            }
+
+            public HashSet<(int, int)> PerimeterPoints
+            {
+                get
+                {
+                    if (_perimeterPoints.Count == 0)
+                        _perimeterPoints = GetPerimeterPoints(_pixels);
+                    return _perimeterPoints;
+                }
+            }
+
+            public List<(int, int)> HullExtremeties
+            {
+                get
+                {
+                    if (_hullExtremeties.Count == 0)
+                        _hullExtremeties = CalculateHullExtremeties();  // For convex hull operations 8-connectivity for perimeter is always used
+                    return _hullExtremeties;
+                }
+            }
+
+            public HashSet<(int, int)> HullPerimeterPoints
+            {
+                get
+                {
+                    if (_hullPerimeterPoints.Count == 0)
+                        _hullPerimeterPoints = GetPerimeterPoints(HullPoints.ToHashSet());
+                    return _hullPerimeterPoints;
+                }
+            }
+
             public List<(int, int)> HullPoints
             {
                 get
                 {
-                    if (_convexPerimeterPoints.Count == 0)
-                        _convexPerimeterPoints = CalculateHullPoints();  // For convex hull operations 8-connectivity for perimeter is always used
-                    return _convexPerimeterPoints;
+                    if (_hullPoints.Count == 0)
+                        _hullPoints = CalculateHullPoints();
+                    return _hullPoints;
                 }
-            }
+            }    
+
+            public int HullArea => HullPoints.Count;
+
 
             public ConnectedComponent(int label, HashSet<(int, int)> pixels)
             {
@@ -159,7 +211,7 @@ namespace SS_OpenCV
 
             private double GetMaxDiameter()
             {             
-                List<(int, int)> hull = HullPoints;
+                List<(int, int)> hull = HullExtremeties;
 
                 double maxDiameter = 0;
                 int n = hull.Count;
@@ -177,96 +229,43 @@ namespace SS_OpenCV
                 return maxDiameter;
             }
 
-            public HashSet<(int, int)> GetPerimeterPoints(LineType connectivity = LineType.EightConnected)
-            {
-                HashSet<(int, int)> findPerimeterPoints(bool[,] mask)
-                {
-                    var relativePoints = GetRelativePoints(mask);
-                    HashSet<(int, int)> perimeterPoints = new HashSet<(int, int)>();
+            
+            private HashSet<(int, int)> GetPerimeterPoints(HashSet<(int, int)> pixels)
+            {           
+                var relativePoints = GetRelativePoints(new bool[3, 3] { { true, true, true }, { true, false, true }, { true, true, true } });
+                HashSet<(int, int)> perimeterPoints = new HashSet<(int, int)>();
 
-                    foreach (var pixel in Pixels)
+                foreach (var pixel in pixels)
+                {
+                    foreach (var relativePoint in relativePoints)
                     {
-                        foreach (var relativePoint in relativePoints)
+                        var neighbor = (pixel.Item1 + relativePoint.Item1, pixel.Item2 + relativePoint.Item2);
+                        if (!pixels.Contains(neighbor))
                         {
-                            var neighbor = (pixel.Item1 + relativePoint.Item1, pixel.Item2 + relativePoint.Item2);
-                            if (!Pixels.Contains(neighbor))
-                            {
-                                perimeterPoints.Add(neighbor);
-                            }
+                            perimeterPoints.Add(neighbor);
                         }
                     }
-
-                    return perimeterPoints;
                 }
 
-                switch (connectivity)
-                {
-                    case LineType.EightConnected:
-                        if (_perimeter8CPoints.Count == 0)
-                        {
-                            _perimeter8CPoints = findPerimeterPoints(new bool[3, 3] { { true, true, true }, { true, false, true }, { true, true, true } });
-                        }
-                        return _perimeter8CPoints;
-                    case LineType.FourConnected:
-                        if (_perimeter4CPoints.Count == 0)
-                        {
-                            _perimeter4CPoints = findPerimeterPoints(new bool[3, 3] { { false, true, false }, { true, false, true }, { false, true, false } });
-                        }
-                        return _perimeter4CPoints;
-                    default:
-                        throw new ArgumentException("Invalid connectivity type");
-
-                }    
+                return perimeterPoints; 
          
             }
 
-            public double GetPerimeter(LineType connectivity = LineType.EightConnected)
+            private double GetPerimeter()
             {
-
-                var directions4C = new (int dx, int dy)[]
+                double perimeter = 0;
+                double sqrtOfTwo = Math.Sqrt(2);
+                foreach (var code in ChainCode)
                 {
-                    (0, 1),  // Right (0)
-                    (1, 0),  // Down (2)
-                    (0, -1), // Left (4)
-                    (-1, 0)  // Up (6)
-                };
-
-                var directions8C = new (int dx, int dy)[]
-                {
-                    (0, 1),   // Right (0)
-                    (1, 1),   // Down-Right (1)
-                    (1, 0),   // Down (2)
-                    (1, -1),  // Down-Left (3)
-                    (0, -1),  // Left (4)
-                    (-1, -1), // Up-Left (5)
-                    (-1, 0),  // Up (6)
-                    (-1, 1)   // Up-Right (7)
-                };
-
-                switch (connectivity)
-                {
-                    case LineType.EightConnected:
-                        if (_perimeter8C == null)
-                        {
-                            _perimeter8C = CalculatePerimeter(directions8C, GetPerimeterPoints(connectivity));
-                        }
-                        return _perimeter8C.Value;
-
-                    case LineType.FourConnected:
-                        if (_perimeter4C == null)
-                        {
-                            _perimeter4C = CalculatePerimeter(directions4C, GetPerimeterPoints(connectivity));
-                        }
-                        return _perimeter4C.Value;
-
-                    default: throw new ArgumentException("Invalid connectivity type");
-                }                    
+                    perimeter += (code % 2 == 0) ? 1 : sqrtOfTwo;
+                }
+                return perimeter;
             }
 
 
-            private List<(int, int)> CalculateHullPoints()
+            private List<(int, int)> CalculateHullExtremeties()
             {
-                HashSet<(int, int)> perimeterPoints = GetPerimeterPoints();
+                HashSet<(int, int)> perimeterPoints = PerimeterPoints;
 
                 if (perimeterPoints.Count < 3) return new List<(int, int)>(perimeterPoints);
 
@@ -295,60 +294,97 @@ namespace SS_OpenCV
                 return hull;
             }
 
-            private double CalculatePerimeter((int dx, int dy)[] directions, HashSet<(int, int)> perimeterPoints)
+            private List<(int, int)> CalculateHullPoints()
+            {
+                List<(int, int)> hullPoints = new List<(int, int)>();
+
+                // Regular bounding box is here for less redundancy and better performance. It should be equivalent to the bounding box of the hull
+                int minX = BoundingBox.Left;
+                int minY = BoundingBox.Top;
+                int maxX = BoundingBox.Right;
+                int maxY = BoundingBox.Bottom;
+
+                for (int y = minY; y <= maxY; y++)
+                {
+                    for (int x = minX; x <= maxX; x++)
+                    {
+                        if (IsPointInConvexPolygon((x, y), HullExtremeties))
+                        {
+                            hullPoints.Add((x, y));
+                        }
+                    }
+                }
+                return hullPoints;
+            }
+
+            /// <summary>
+            /// Determine if a point is inside a convex polygon
+            /// </summary>
+            /// <param name="point">Point to be evaluated</param>
+            /// <param name="orderedVertices">Ordered list of vertices that form the polygon</param>
+            /// <returns></returns>
+            private bool IsPointInConvexPolygon((int x, int y) point, List<(int x, int y)> orderedVertices)
+            {
+                int n = orderedVertices.Count;
+
+                // Initialize the sign of the cross-product for the first edge
+                int prevCross = 0;
+
+                for (int i = 0; i < n; i++)
+                {
+                    var p1 = orderedVertices[i];
+                    var p2 = orderedVertices[(i + 1) % n];
+
+                    // Edge vector
+                    int edgeX = p2.x - p1.x;
+                    int edgeY = p2.y - p1.y;
+
+                    // Vector from the point to the edge start
+                    int pointX = point.x - p1.x;
+                    int pointY = point.y - p1.y;
+
+                    // Cross product to check which side of the edge the point lies on
+                    int cross = edgeX * pointY - edgeY * pointX;
+
+                    // Check the sign consistency of the cross-product
+                    if (cross != 0)
+                    {
+                        if (prevCross == 0)
+                        {
+                            prevCross = cross; // Set the initial direction
+                        }
+                        else if ((cross > 0) != (prevCross > 0))
+                        {
+                            return false; // Point is on different sides of edges
+                        }
+                    }
+                }
+
+                return true; // Point is inside all edges
+            }
+
+            private List<int> GetChainCode(HashSet<(int, int)> perimeterPoints)
             {
 
-                double sqrtOfTwo = Math.Sqrt(2);
-                double perimeter = 0;
-
-
-                while (perimeterPoints.Count > 0)
+                var directions = new (int dx, int dy)[]
                 {
+                    (0, 1),   // Right (0)
+                    (1, 1),   // Down-Right (1)
+                    (1, 0),   // Down (2)
+                    (1, -1),  // Down-Left (3)
+                    (0, -1),  // Left (4)
+                    (-1, -1), // Up-Left (5)
+                    (-1, 0),  // Up (6)
+                    (-1, 1)   // Up-Right (7)
+                };
 
-                    // Start at uppermost and leftmost pixel
-                    (int, int) startPixel = perimeterPoints.Aggregate(
-                        (min, current) => current.Item2 < min.Item2 ?               // Check if y is smaller
-                        current :                                                   // If it is, new min is found
-                        current.Item2 == min.Item2 && current.Item1 < min.Item1 ?   // If not, check if y is the same but x is smaller
-                        current : min);                                             // If it is, new min is found, otherwise min is the same
+                List<int> chainCode = new List<int>();
 
-                    HashSet<(int, int)> pointsToRemove = new HashSet<(int, int)>(); // Different for each while iteration
-                    (int, int) currentPixel = startPixel;
-                    int currentDirection = 0;
+                // TODO: Implement the chain code algorithm
 
-                    do
-                    {
-                        bool foundNext = false;
-
-                        // Search in clockwise order for the next boundary pixel
-                        for (int i = 0; i < directions.Length; i++)
-                        {
-                            currentDirection = (currentDirection + i) % directions.Length;
-                            (int, int) nextPixel = (currentPixel.Item1 + directions[currentDirection].dx, currentPixel.Item2 + directions[currentDirection].dy);
-
-                            if (perimeterPoints.Contains(nextPixel))
-                            {
-
-                                perimeter += (currentDirection % 2 == 0) ? 1 : sqrtOfTwo;
-                                pointsToRemove.Add(currentPixel);
-                                currentPixel = nextPixel;
-                                foundNext = true;
-                                break;
-                            }
-                        }
-
-                        if (!foundNext) // No next pixel found (should not happen)
-                        {
-                            break;
-                        }
-
-                    } while (currentPixel != startPixel);
-
-                    pointsToRemove.Add(currentPixel);
-                    perimeterPoints.RemoveWhere(pointsToRemove.Contains);
-                }
-                return perimeter;
+                return chainCode;
             }
+
             private double Distance((int, int) p1, (int, int) p2)
             {
                 return Math.Sqrt(
@@ -3094,7 +3130,7 @@ namespace SS_OpenCV
                 for (int i = 0; i < connectedComponents.Count; i++)
                 {
                     Bgr color = colorPalette[i];
-                    foreach ((int x, int y) in connectedComponents[i].GetPerimeterPoints())
+                    foreach ((int x, int y) in connectedComponents[i].PerimeterPoints)
                     {
                         byte* dataPtrAux = dataPtr + y * widthStep + x * nChan;
                         dataPtrAux[0] = (byte) color.Blue;
@@ -3152,6 +3188,35 @@ namespace SS_OpenCV
                 for (int i = 0; i < connectedComponents.Count; i++)
                 {
                     Bgr color = colorPalette[i];
+                    foreach ((int x, int y) in connectedComponents[i].HullPerimeterPoints)
+                    {
+                        byte* dataPtrAux = dataPtr + y * widthStep + x * nChan;
+                        dataPtrAux[0] = (byte)color.Blue;
+                        dataPtrAux[1] = (byte)color.Green;
+                        dataPtrAux[2] = (byte)color.Red;
+                    }
+                }
+            }
+        }
+
+        public static void DrawHullArea(Image<Bgr, byte> img, List<ConnectedComponent> connectedComponents, LineType connectivity = LineType.EightConnected)
+        {
+            List<Bgr> colorPalette = getBgrPalette(connectedComponents.Count);
+
+            unsafe
+            {
+                MIplImage m = img.MIplImage;
+                byte* dataPtr = (byte*)m.ImageData.ToPointer();
+
+                int width = img.Width;
+                int height = img.Height;
+                int nChan = m.NChannels; // number of channels - 3
+                int padding = m.WidthStep - m.NChannels * m.Width; // alingnment bytes (padding)
+                int widthStep = m.WidthStep;
+
+                for (int i = 0; i < connectedComponents.Count; i++)
+                {
+                    Bgr color = colorPalette[i];
                     foreach ((int x, int y) in connectedComponents[i].HullPoints)
                     {
                         byte* dataPtrAux = dataPtr + y * widthStep + x * nChan;
@@ -3173,6 +3238,26 @@ namespace SS_OpenCV
         /// <param name="sinalResult">Objecto resultado - lista de sinais e respectivas informaçoes</param>
         public static void SinalReader(Image<Bgr, byte> imgDest, Image<Bgr, byte> imgOrig, int level, out Results sinalResult)
         {
+            List<Image<Bgr, byte>> getDigitsPreprocessed(int height, int width)
+            {
+                string filePath = "./Imagens/digitos";
+                string filePattern = "*.png";
+
+                List<Image<Bgr, byte>> digitImages = new List<Image<Bgr, byte>>();
+
+                string[] digitImageFiles = Directory.GetFiles(filePath, filePattern);
+                foreach (string digitImageFile in digitImageFiles)
+                {
+                    Image<Bgr, byte> digitImage = new Image<Bgr, byte>(digitImageFile);
+                    Negative(digitImage);
+                    ConvertToBW_Otsu(digitImage);
+                    digitImage.Resize(width, height, Inter.Linear);
+                    digitImages.Add(digitImage);
+                }
+
+                return digitImages;
+                
+            }
             Image<Bgr, byte> imgCopy = imgOrig.Copy();
             /*
              * These values restrict the ranges of red to those used in traffic signs. The hue range for the red color is 340-20 (170-10 in OpenCV), 
@@ -3180,74 +3265,77 @@ namespace SS_OpenCV
              */
             int hueLowerBound = 170, hueUpperBound = 5; // int hueLowerBound = 105, hueUpperBound = 135; // Blue hue, for example
             int minSaturation = 150, maxSaturation = 255;
-            int minValue = 90, maxValue = 255; // previously, minValue was 50
+            int minValue = 70, maxValue = 255; // previously, minValue was 50
 
             BinarizeOnColor(imgCopy, hueLowerBound, hueUpperBound, minSaturation, maxSaturation, minValue, maxValue);
-            Opening(imgCopy, new bool[3, 3] { { true, true, true }, { true, true, true }, { true, true, true } });
+
+            /*
+             * These values will be needed to binarize on the color black for digits in speed signs
+             */
+            hueLowerBound = 0; 
+            hueUpperBound = 180;
+            minSaturation = 0; 
+            maxSaturation = 255;
+            minValue = 0; 
+            maxValue = 51; // 20 % of max value
+
+            Closing(imgCopy, new bool[3, 3] { { true, true, true }, { true, true, true }, { true, true, true } });
             List<ConnectedComponent> connectedComponents = ConnectedComponents(imgCopy);
+
+            float minArea = imgCopy.Height * imgCopy.Width * 0.0001f;  // 0.01% of image size
+
+            sinalResult = new Results();
 
             foreach (var obj in connectedComponents)
             {
-                imgDest.Draw(obj.BoundingBox, new Bgr(0, 255, 0), 2);
-                //var circularity = 4 * obj.Area / (Math.PI * Math.Pow(obj.MaxDiameter, 2));
-                var circularity = 4 * Math.PI / Math.Pow(obj.GetPerimeter(), 2);
+                if (obj.Area < minArea) // Noise
+                    continue;
+
+                Sinal sinal = new Sinal();
+                sinal.sinalRect = obj.BoundingBox;
+
+                var circularity = 4 * obj.HullArea / (Math.PI * Math.Pow(obj.MaxDiameter, 2));  // Since the traffic sign components will be donut shaped, we need the hull area
+                if (circularity > 0.65) // Some signs may appear from a different perspective so a little tolerance is given
+                {
+                    Image<Bgr, byte> trafficSignROI = imgDest.GetSubRect(obj.BoundingBox);
+                    Image<Bgr, byte> trafficSignROICopy = trafficSignROI.Copy();
+
+                    BinarizeOnColor(trafficSignROICopy, hueLowerBound, hueUpperBound, minSaturation, maxSaturation, minValue, maxValue);
+
+                    // Extract digits (if they exist)
+
+
+                    // Find out if it is a speed sign or a prohibition sign
+                    /* 
+                    sinal.sinalEnum = ResultsEnum.sinal_limite_velocidade;               
+
+                    Digito digito = new Digito();
+                    digito.digitoRect = new Rectangle(20, 30, 100, 40);
+                    digito.digito = "1";
+                    sinal.digitos.Add(digito);
+
+                    Digito digito2 = new Digito();
+                    digito2.digitoRect = new Rectangle(80, 30, 100, 40);
+                    digito2.digito = "1";
+                    sinal.digitos.Add(digito2);
+                    */
+                }
+                else if (true)  // Check for danger signs
+                {
+                    sinal.sinalEnum = ResultsEnum.sinal_perigo;
+                }
+
+                else           // Unknown signal
+                {
+                    sinal.sinalEnum = ResultsEnum.unknown;
+                    sinalResult.results.Add(sinal);
+                    continue;
+                }
+
+                imgDest.Draw(sinal.sinalRect, new Bgr(Color.Green));
+                // add sinal to results
+                sinalResult.results.Add(sinal);
             }
-            /*
-            // Draw boxes on identified objects
-            foreach (var box in boundingBoxes.Values)
-            {
-                int xMin = box.xMin;
-                int yMin = box.yMin;
-                int xMax = box.xMax;
-                int yMax = box.yMax;
-
-                var rect = new Rectangle(new Point(xMin, yMin), new Size(xMax - xMin, yMax - yMin));
-
-                imgDest.Draw(rect, new Bgr(0, 255, 0), 2);
-            }*/
-
-            /*
-            switch (level)
-            {
-                case 1:
-                    //SinalReaderLevel1(imgDest, imgOrig, out sinalResult);
-                    break;
-                case 2:
-                    //SinalReaderLevel2(imgDest, imgOrig, out sinalResult);
-                    break;
-                case 3:
-                    //SinalReaderLevel3(imgDest, imgOrig, out sinalResult);
-                    break;
-                case 4:
-                    //SinalReaderLevel4(imgDest, imgOrig, out sinalResult);
-                    break;
-            }
-
-            sinalResult = new Results();
-
-            //Sinal creation
-            Sinal sinal = new Sinal();
-            sinal.sinalEnum = ResultsEnum.sinal_limite_velocidade;
-            sinal.sinalRect = new Rectangle(10, 10, 200, 200);
-
-            Digito digito = new Digito();
-            digito.digitoRect = new Rectangle(20, 30, 100, 40);
-            digito.digito = "1";
-            sinal.digitos.Add(digito);
-
-            Digito digito2 = new Digito();
-            digito2.digitoRect = new Rectangle(80, 30, 100, 40);
-            digito2.digito = "1";
-            sinal.digitos.Add(digito2);
-
-            imgDest.Draw(sinal.sinalRect, new Bgr(Color.Green));
-
-            // add sinal to results
-            sinalResult.results.Add(sinal);
-            */
-            sinalResult = new Results();
-            
-
         }
 
 
