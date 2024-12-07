@@ -97,6 +97,8 @@
             this.areaToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.hullPerimeterToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.hullAreaToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.debugOnlyToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.filterImageBitmaskToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.autoZoomToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.sinalReaderToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.autoresToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -105,7 +107,6 @@
             this.ImageViewer = new Emgu.CV.UI.ImageBox();
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
             this.statusLabel = new System.Windows.Forms.ToolStripStatusLabel();
-            this.onBlackToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip1.SuspendLayout();
             this.panel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.ImageViewer)).BeginInit();
@@ -195,6 +196,7 @@
             this.morphOperationsToolStripMenuItem,
             this.imageSegmentationToolStripMenuItem,
             this.featureExtractionToolStripMenuItem,
+            this.debugOnlyToolStripMenuItem,
             this.autoZoomToolStripMenuItem,
             this.sinalReaderToolStripMenuItem});
             this.imageToolStripMenuItem.Name = "imageToolStripMenuItem";
@@ -280,8 +282,7 @@
             this.binarizationToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.manualThresholdToolStripMenuItem,
             this.otsuToolStripMenuItem,
-            this.onRedToolStripMenuItem,
-            this.onBlackToolStripMenuItem});
+            this.onRedToolStripMenuItem});
             this.binarizationToolStripMenuItem.Name = "binarizationToolStripMenuItem";
             this.binarizationToolStripMenuItem.Size = new System.Drawing.Size(248, 26);
             this.binarizationToolStripMenuItem.Text = "Binarization";
@@ -335,7 +336,7 @@
             // translationToolStripMenuItem
             // 
             this.translationToolStripMenuItem.Name = "translationToolStripMenuItem";
-            this.translationToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.translationToolStripMenuItem.Size = new System.Drawing.Size(164, 26);
             this.translationToolStripMenuItem.Text = "Translation";
             this.translationToolStripMenuItem.Click += new System.EventHandler(this.translationToolStripMenuItem_Click);
             // 
@@ -345,7 +346,7 @@
             this.nearestNeighborToolStripMenuItem1,
             this.bilinearInterpolationToolStripMenuItem});
             this.rotationToolStripMenuItem.Name = "rotationToolStripMenuItem";
-            this.rotationToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.rotationToolStripMenuItem.Size = new System.Drawing.Size(164, 26);
             this.rotationToolStripMenuItem.Text = "Rotation";
             // 
             // nearestNeighborToolStripMenuItem1
@@ -368,7 +369,7 @@
             this.nearestNeighborToolStripMenuItem,
             this.bilinearInterpolationToolStripMenuItem1});
             this.scaleToolStripMenuItem.Name = "scaleToolStripMenuItem";
-            this.scaleToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.scaleToolStripMenuItem.Size = new System.Drawing.Size(164, 26);
             this.scaleToolStripMenuItem.Text = "Scale";
             // 
             // nearestNeighborToolStripMenuItem
@@ -391,7 +392,7 @@
             this.nearestNeighborToolStripMenuItem2,
             this.bilinearInterpolationToolStripMenuItem2});
             this.zoomToolStripMenuItem.Name = "zoomToolStripMenuItem";
-            this.zoomToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.zoomToolStripMenuItem.Size = new System.Drawing.Size(164, 26);
             this.zoomToolStripMenuItem.Text = "Zoom";
             // 
             // nearestNeighborToolStripMenuItem2
@@ -643,6 +644,21 @@
             this.hullAreaToolStripMenuItem.Text = "Hull Area";
             this.hullAreaToolStripMenuItem.Click += new System.EventHandler(this.hullAreaToolStripMenuItem_Click);
             // 
+            // debugOnlyToolStripMenuItem
+            // 
+            this.debugOnlyToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.filterImageBitmaskToolStripMenuItem});
+            this.debugOnlyToolStripMenuItem.Name = "debugOnlyToolStripMenuItem";
+            this.debugOnlyToolStripMenuItem.Size = new System.Drawing.Size(231, 26);
+            this.debugOnlyToolStripMenuItem.Text = "Debug Only";
+            // 
+            // filterImageBitmaskToolStripMenuItem
+            // 
+            this.filterImageBitmaskToolStripMenuItem.Name = "filterImageBitmaskToolStripMenuItem";
+            this.filterImageBitmaskToolStripMenuItem.Size = new System.Drawing.Size(237, 26);
+            this.filterImageBitmaskToolStripMenuItem.Text = "Filter Image (Bitmask)";
+            this.filterImageBitmaskToolStripMenuItem.Click += new System.EventHandler(this.filterImageBitmaskToolStripMenuItem_Click);
+            // 
             // autoZoomToolStripMenuItem
             // 
             this.autoZoomToolStripMenuItem.CheckOnClick = true;
@@ -715,13 +731,6 @@
             this.statusLabel.Name = "statusLabel";
             this.statusLabel.Size = new System.Drawing.Size(60, 20);
             this.statusLabel.Text = "X :-   Y:-";
-            // 
-            // onBlackToolStripMenuItem
-            // 
-            this.onBlackToolStripMenuItem.Name = "onBlackToolStripMenuItem";
-            this.onBlackToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
-            this.onBlackToolStripMenuItem.Text = "On Black";
-            this.onBlackToolStripMenuItem.Click += new System.EventHandler(this.onBlackToolStripMenuItem_Click);
             // 
             // MainForm
             // 
@@ -825,7 +834,8 @@
         private System.Windows.Forms.ToolStripMenuItem hullPerimeterToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem hullAreaToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem closingToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem onBlackToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem debugOnlyToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem filterImageBitmaskToolStripMenuItem;
     }
 }
 

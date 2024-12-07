@@ -320,28 +320,6 @@ namespace SS_OpenCV
             Cursor = Cursors.Default; // normal cursor
         }
 
-        private void onBlackToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            if (img == null) // verify if the image is already opened
-                return;
-            Cursor = Cursors.WaitCursor; // clock cursor 
-
-            //copy Undo Image
-            imgUndo = img.Copy();
-
-
-            int hueLowerBound = 0, hueUpperBound = 180;
-            int minSaturation = 0, maxSaturation = 255;
-            int minValue = 0, maxValue = 51; // 20 % of max value
-
-            ImageClass.BinarizeOnColor(img, hueLowerBound, hueUpperBound, minSaturation, maxSaturation, minValue, maxValue);
-
-            ImageViewer.Image = img;
-            ImageViewer.Refresh(); // refresh image on the screen
-
-            Cursor = Cursors.Default; // normal cursor
-        }
-
         private void yCrCbToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (img == null) // verify if the image is already opened
@@ -1021,6 +999,42 @@ namespace SS_OpenCV
             imgUndo = img.Copy();
 
             ImageClass.SinalReader(img, imgUndo, 0, out var sinalResult);
+
+            ImageViewer.Image = img;
+            ImageViewer.Refresh(); // refresh image on the screen
+
+            Cursor = Cursors.Default; // normal cursor
+        }
+
+        private void filterImageBitmaskToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (img == null) // verify if the image is already opened
+                return;
+
+            Cursor = Cursors.WaitCursor; // clock cursor 
+
+            //copy Undo Image
+            imgUndo = img.Copy();
+
+            /*
+             * These values restrict the ranges of red to those used in traffic signs. The hue range for the red color is 340-20 (170-10 in OpenCV), 
+             * the saturation and value would be adjusted in kind.
+             */
+            int hueLowerBound = 170, hueUpperBound = 5; // int hueLowerBound = 105, hueUpperBound = 135; // Blue hue, for example
+            int minSaturation = 150, maxSaturation = 255;
+            int minValue = 70, maxValue = 255; // previously, minValue was 50
+
+            Image<Bgr, byte> imgCopy = img.Copy();
+
+            ImageClass.BinarizeOnColor(imgCopy, hueLowerBound, hueUpperBound, minSaturation, maxSaturation, minValue, maxValue);
+            List<ImageClass.ConnectedComponent> connectedComponents = ImageClass.ConnectedComponents(imgCopy, colorComponents: false);
+            
+            foreach (var obj in connectedComponents)
+            {
+                Mat bitmask = ImageClass.GetBitmaskFromPoints(img, obj.HullPoints.ToHashSet());
+                ImageClass.FilterImage(img, bitmask, Color.White);
+                break;
+            }
 
             ImageViewer.Image = img;
             ImageViewer.Refresh(); // refresh image on the screen

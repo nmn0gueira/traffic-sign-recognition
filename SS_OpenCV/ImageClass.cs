@@ -7,14 +7,13 @@ using ResultsDLL;
 using Emgu.CV.CvEnum;
 using System.Collections.Generic;
 using System.Linq;
-using System.Windows.Forms;
-using System.ComponentModel;
 using System.IO;
+using System.Threading.Tasks;
 
 
 namespace SS_OpenCV
 {
-    public enum LineType { FourConnected, EightConnected };
+    
 
     /// <summary>
     /// Union Find data structure used for more efficent implementation of the connected components algorithm
@@ -62,6 +61,7 @@ namespace SS_OpenCV
 
     class ImageClass
     {
+        public enum LineType { FourConnected, EightConnected };
 
         public class ConnectedComponent
         {
@@ -72,7 +72,7 @@ namespace SS_OpenCV
             private double? _perimeter = null;
             private List<int> _chainCode = new List<int>();
             private HashSet<(int, int)> _perimeterPoints = new HashSet<(int, int)>();
-            private List<(int, int)> _hullExtremeties = new List<(int, int)>();
+            private List<(int, int)> _hullExtremities = new List<(int, int)>();
             private HashSet<(int, int)> _hullPerimeterPoints = new HashSet<(int, int)>();
             private List<(int, int)> _hullPoints = new List<(int, int)>();
             
@@ -90,6 +90,7 @@ namespace SS_OpenCV
                     return _boundingBox.Value;
                 }
             }
+            
 
             public (int, int) Centroid
             {
@@ -141,13 +142,13 @@ namespace SS_OpenCV
                 }
             }
 
-            public List<(int, int)> HullExtremeties
+            public List<(int, int)> HullExtremities
             {
                 get
                 {
-                    if (_hullExtremeties.Count == 0)
-                        _hullExtremeties = CalculateHullExtremeties();  // For convex hull operations 8-connectivity for perimeter is always used
-                    return _hullExtremeties;
+                    if (_hullExtremities.Count == 0)
+                        _hullExtremities = CalculateHullExtremities();  // For convex hull operations 8-connectivity for perimeter is always used
+                    return _hullExtremities;
                 }
             }
 
@@ -211,7 +212,7 @@ namespace SS_OpenCV
 
             private double GetMaxDiameter()
             {             
-                List<(int, int)> hull = HullExtremeties;
+                List<(int, int)> hull = HullExtremities;
 
                 double maxDiameter = 0;
                 int n = hull.Count;
@@ -263,7 +264,7 @@ namespace SS_OpenCV
             }
 
 
-            private List<(int, int)> CalculateHullExtremeties()
+            private List<(int, int)> CalculateHullExtremities()
             {
                 HashSet<(int, int)> perimeterPoints = PerimeterPoints;
 
@@ -273,7 +274,7 @@ namespace SS_OpenCV
                 (int, int) startPoint = perimeterPoints.Aggregate((min, current) => current.Item1 < min.Item1 ? current : min);
                 (int, int) currentPoint = startPoint;
 
-                bool IsCounterclockwise((int, int) p1, (int, int) p2, (int, int) p3)
+                bool isCounterClockwise((int, int) p1, (int, int) p2, (int, int) p3)
                 {
                     return (p3.Item2 - p1.Item2) * (p2.Item1 - p1.Item1) - (p3.Item1 - p1.Item1) * (p2.Item2 - p1.Item2) > 0;
                 }
@@ -285,7 +286,7 @@ namespace SS_OpenCV
                     foreach (var candidate in perimeterPoints)
                     {
                         if (candidate == currentPoint) continue;
-                        if (nextPoint == (-1, -1) || IsCounterclockwise(currentPoint, nextPoint, candidate))
+                        if (nextPoint == (-1, -1) || isCounterClockwise(currentPoint, nextPoint, candidate))
                             nextPoint = candidate;
                     }
                     currentPoint = nextPoint;
@@ -308,7 +309,7 @@ namespace SS_OpenCV
                 {
                     for (int x = minX; x <= maxX; x++)
                     {
-                        if (IsPointInConvexPolygon((x, y), HullExtremeties))
+                        if (IsPointInConvexPolygon((x, y), HullExtremities))
                         {
                             hullPoints.Add((x, y));
                         }
@@ -3238,26 +3239,25 @@ namespace SS_OpenCV
         /// <param name="sinalResult">Objecto resultado - lista de sinais e respectivas informaçoes</param>
         public static void SinalReader(Image<Bgr, byte> imgDest, Image<Bgr, byte> imgOrig, int level, out Results sinalResult)
         {
-            List<Image<Bgr, byte>> getDigitsPreprocessed(int height, int width)
+            // Assumes directory only has images for digits that are named with their respective digit
+            List<(int, Image<Bgr, byte>)> getDigitsPreprocessed(int height, int width)
             {
-                string filePath = "./Imagens/digitos";
+                string filePath = "C:\\Users\\nmnog\\Documents\\Universidade\\2024-25\\1º Semestre\\Opcional\\SS\\Projetos\\1º Projeto\\SS_OpenCV_Base\\Imagens\\digitos";
                 string filePattern = "*.png";
 
-                List<Image<Bgr, byte>> digitImages = new List<Image<Bgr, byte>>();
+                List<(int, Image<Bgr, byte>)> digitImages = new List<(int, Image<Bgr, byte>)>();
 
                 string[] digitImageFiles = Directory.GetFiles(filePath, filePattern);
                 foreach (string digitImageFile in digitImageFiles)
                 {
                     Image<Bgr, byte> digitImage = new Image<Bgr, byte>(digitImageFile);
-                    Negative(digitImage);
                     ConvertToBW_Otsu(digitImage);
-                    digitImage.Resize(width, height, Inter.Linear);
-                    digitImages.Add(digitImage);
+                    int digit = int.Parse(Path.GetFileNameWithoutExtension(digitImageFile));
+                    digitImages.Add((digit, digitImage.Resize(width, height, Inter.Linear)));
                 }
-
                 return digitImages;
-                
             }
+
             Image<Bgr, byte> imgCopy = imgOrig.Copy();
             /*
              * These values restrict the ranges of red to those used in traffic signs. The hue range for the red color is 340-20 (170-10 in OpenCV), 
@@ -3269,72 +3269,281 @@ namespace SS_OpenCV
 
             BinarizeOnColor(imgCopy, hueLowerBound, hueUpperBound, minSaturation, maxSaturation, minValue, maxValue);
 
-            /*
-             * These values will be needed to binarize on the color black for digits in speed signs
-             */
-            hueLowerBound = 0; 
-            hueUpperBound = 180;
-            minSaturation = 0; 
-            maxSaturation = 255;
-            minValue = 0; 
-            maxValue = 51; // 20 % of max value
+            bool[,] mask = new bool[3, 3] { { true, true, true }, { true, true, true }, { true, true, true } };
+            Closing(imgCopy, mask);
+            Opening(imgCopy, mask);
 
-            Closing(imgCopy, new bool[3, 3] { { true, true, true }, { true, true, true }, { true, true, true } });
-            List<ConnectedComponent> connectedComponents = ConnectedComponents(imgCopy);
+            List<ConnectedComponent> connectedComponents = ConnectedComponents(imgCopy, colorComponents: false);
 
-            float minArea = imgCopy.Height * imgCopy.Width * 0.0001f;  // 0.01% of image size
+            float minArea = imgCopy.Height * imgCopy.Width * 0.001f;  // 0.1% of image size
 
             sinalResult = new Results();
 
             foreach (var obj in connectedComponents)
             {
-                if (obj.Area < minArea) // Noise
+                if (obj.Area < minArea) // Noise that can be ignored
                     continue;
 
                 Sinal sinal = new Sinal();
+
                 sinal.sinalRect = obj.BoundingBox;
 
                 var circularity = 4 * obj.HullArea / (Math.PI * Math.Pow(obj.MaxDiameter, 2));  // Since the traffic sign components will be donut shaped, we need the hull area
+                
                 if (circularity > 0.65) // Some signs may appear from a different perspective so a little tolerance is given
                 {
-                    Image<Bgr, byte> trafficSignROI = imgDest.GetSubRect(obj.BoundingBox);
-                    Image<Bgr, byte> trafficSignROICopy = trafficSignROI.Copy();
+                    Image<Bgr, byte> trafficSignROI = imgDest.Copy(obj.BoundingBox);
 
-                    BinarizeOnColor(trafficSignROICopy, hueLowerBound, hueUpperBound, minSaturation, maxSaturation, minValue, maxValue);
+                    // Filter out points in the image that are not part of the hull area and extract the ROI for the component
+                    Mat bitmaskROI = new Mat(GetBitmaskFromPoints(imgDest, obj.HullPoints.ToHashSet()), obj.BoundingBox);
+
+                    // We apply the bitmask so we are only working with the sign and everything else is white
+                    FilterImage(trafficSignROI, bitmaskROI, Color.White);
+
+                    // Preprocessing to make sure the numbers (if they exist) are the only components in the image
+                    RedChannel(trafficSignROI);
+                    Negative(trafficSignROI);
+                    ConvertToBW(trafficSignROI, 190);
+                    Opening(trafficSignROI, mask);
 
                     // Extract digits (if they exist)
+                    List<ConnectedComponent> digitComponents = ConnectedComponents(trafficSignROI, colorComponents: false);
+                    
+                    // If number of components disallows them from being a speed sign
+                    if (digitComponents.Count < 2 || digitComponents.Count > 3)
+                    {
+                        sinal.sinalEnum = ResultsEnum.sinal_proibicao;
+                    }
 
+                    else
+                    {
+                        List<Digito> digitObjects = new List<Digito>();
 
-                    // Find out if it is a speed sign or a prohibition sign
-                    /* 
-                    sinal.sinalEnum = ResultsEnum.sinal_limite_velocidade;               
+                        foreach (var digitComponent in digitComponents)
+                        {
+                            Image<Bgr, byte> digitROI = trafficSignROI.Copy(digitComponent.BoundingBox);
+                            Negative(digitROI);
+                            List<(int, Image<Bgr, byte>)> digitImages = getDigitsPreprocessed(digitROI.Height, digitROI.Width);
 
-                    Digito digito = new Digito();
-                    digito.digitoRect = new Rectangle(20, 30, 100, 40);
-                    digito.digito = "1";
-                    sinal.digitos.Add(digito);
+                            int bestScoreDigit = -1;
+                            float bestScore = 0;
+                            Image<Bgr, byte> bestMatch = null;
 
-                    Digito digito2 = new Digito();
-                    digito2.digitoRect = new Rectangle(80, 30, 100, 40);
-                    digito2.digito = "1";
-                    sinal.digitos.Add(digito2);
-                    */
+                            foreach ((int digit, Image<Bgr, byte> digitImage) in digitImages)
+                            {                               
+                                float score = ComputeSimilarity(digitROI, digitImage);
+                                if (score > bestScore)
+                                {
+                                    bestScoreDigit = digit;
+                                    bestScore = score;
+                                    bestMatch = digitImage;
+                                }
+                            }
+
+                            if (bestScore < 0.7) // If the best match is not good enough, do not consider it
+                            {
+                                break;
+                            }
+
+                            Digito digitObject = new Digito
+                            {
+                                digitoRect = digitComponent.BoundingBox,
+                                digito = bestScoreDigit.ToString()
+                            };
+                            digitObjects.Add(digitObject);
+                        }
+
+                        // If the number of digits is not the same as the number of components, it is not a speed sign
+                        if (digitObjects.Count != digitComponents.Count || !digitObjects.Any(d => d.digito == "0"))
+                        {
+                            sinal.sinalEnum = ResultsEnum.sinal_proibicao;
+                        }
+
+                        else
+                        {
+                            sinal.sinalEnum = ResultsEnum.sinal_limite_velocidade;
+                            sinal.digitos = digitObjects;
+                        }
+                    }
                 }
                 else if (true)  // Check for danger signs
                 {
                     sinal.sinalEnum = ResultsEnum.sinal_perigo;
                 }
 
-                else           // Unknown signal
+                else           // Unknown sign
                 {
                     sinal.sinalEnum = ResultsEnum.unknown;
                     sinalResult.results.Add(sinal);
                     continue;
                 }
 
-                imgDest.Draw(sinal.sinalRect, new Bgr(Color.Green));
-                // add sinal to results
+                imgDest.Draw(sinal.sinalRect, new Bgr(0, 255, 0), 2);
                 sinalResult.results.Add(sinal);
+            }
+        }
+
+        /// <summary>
+        /// Returns a similarity score (ranging from 0 to 1) between two images of same dimensions.
+        /// </summary>
+        /// <param name="firstImage"></param>
+        /// <param name="secondImage"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentException"></exception>
+        private static float ComputeSimilarity(Image<Bgr, byte> firstImage, Image<Bgr, byte> secondImage)
+        {
+            if (firstImage.Width != secondImage.Width || firstImage.Height != secondImage.Height)
+            {
+                throw new ArgumentException("Images must have the same dimensions");
+            }
+            unsafe
+            {
+                MIplImage m = firstImage.MIplImage;
+                byte* firstDataPtr = (byte*)m.ImageData.ToPointer();
+
+                int width = firstImage.Width;
+                int height = firstImage.Height;
+                int nChan = m.NChannels; // number of channels - 3
+                int firstPadding = m.WidthStep - m.NChannels * m.Width; // alingnment bytes (padding)
+
+                MIplImage mTwo = secondImage.MIplImage;
+                byte* secondDataPtr = (byte*)mTwo.ImageData.ToPointer();
+                int secondPadding = mTwo.WidthStep - mTwo.NChannels * mTwo.Width;
+
+                float nSimilarPixels = 0;
+                float totalPixels = width * height;
+
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        if (firstDataPtr[0] == secondDataPtr[0] && 
+                            firstDataPtr[1] == secondDataPtr[1] &&
+                            firstDataPtr[2] == secondDataPtr[2])
+                        {
+                            nSimilarPixels++;
+                        }
+
+                        firstDataPtr += nChan;
+                        secondDataPtr += nChan;
+                    }
+
+                    firstDataPtr += firstPadding;
+                    secondDataPtr += secondPadding;
+                }
+
+                return nSimilarPixels / totalPixels;
+            }
+        }
+
+        /// <summary>
+        /// Return a bitmask for an image that is equivalent to the specified points.
+        /// </summary>
+        /// <param name="img"></param>
+        /// <param name="points"></param>
+        /// <returns></returns>
+        /// <exception cref="NotSupportedException"></exception>
+        public static Mat GetBitmaskFromPoints(Image<Bgr, byte> img, HashSet<(int, int)> points)
+        {
+            DepthType getDepthType(IplDepth iplDepth)
+            {
+                switch (iplDepth)
+                {
+                    case IplDepth.IplDepth_8U:
+                        return DepthType.Cv8U;
+                    case IplDepth.IplDepth_8S:
+                        return DepthType.Cv8S;
+                    case IplDepth.IplDepth16U:
+                        return DepthType.Cv16U;
+                    case IplDepth.IplDepth16S:
+                        return DepthType.Cv16S;
+                    case IplDepth.IplDepth32S:
+                        return DepthType.Cv32S;
+                    case IplDepth.IplDepth32F:
+                        return DepthType.Cv32F;
+                    case IplDepth.IplDepth64F:
+                        return DepthType.Cv64F;
+                    default:
+                        throw new NotSupportedException("Unsupported IplDepth: " + iplDepth);
+                }
+            }
+            Mat bitmask = new Mat(img.Height, img.Width, getDepthType(img.MIplImage.Depth), 1);
+            bitmask.SetTo(new MCvScalar(0)); // Initialize the bitmask to all 0s
+
+            unsafe { 
+                // Get the data pointer
+                byte* dataPtr = (byte*) bitmask.DataPointer.ToPointer();
+
+                // Define the dimensions and step size
+                int rows = bitmask.Rows;
+                int cols = bitmask.Cols;
+                int nChan = bitmask.NumberOfChannels;
+                int padding = bitmask.Step - bitmask.NumberOfChannels * bitmask.Cols; // alingnment bytes (padding)
+
+
+                for (int y = 0; y < rows; y++)
+                {
+                    for (int x = 0; x < cols; x++)
+                    {
+                        if (points.Contains((x, y)))
+                            *dataPtr = 255;
+
+                        dataPtr += nChan;
+                    }
+                    dataPtr += padding;
+                }
+            }
+
+            return bitmask;
+        }
+
+        /// <summary>
+        /// Filter pixels in the image that are not in the bitmask with a given color
+        /// </summary>
+        /// <param name="img"></param>
+        /// <param name="bitmask"></param>
+        /// <param name="color"></param>
+        public static void FilterImage(Image<Bgr, byte> img, Mat bitmask, Color color)
+        {
+            if (img.Width != bitmask.Width || img.Height != bitmask.Height)
+            {
+                throw new ArgumentException("Image and bitmask must have the same dimensions");
+            }
+
+            unsafe
+            {
+                MIplImage m = img.MIplImage;
+                byte* dataPtr = (byte*)m.ImageData.ToPointer();
+
+                int width = img.Width;
+                int height = img.Height;
+                int nChan = m.NChannels; // number of channels - 3
+                int padding = m.WidthStep - m.NChannels * m.Width; // alingnment bytes (padding)
+
+                byte* maskDataPtr = (byte*)bitmask.DataPointer.ToPointer();
+                int maskWidth = bitmask.Width;
+                int maskHeight = bitmask.Height;
+                int maskPadding = bitmask.Step - bitmask.NumberOfChannels * bitmask.Cols; // alingnment bytes (padding)
+                int maskNChan = bitmask.NumberOfChannels;
+
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        if (*maskDataPtr == 0)
+                        {
+                            dataPtr[0] = color.B;
+                            dataPtr[1] = color.G;
+                            dataPtr[2] = color.R;
+                        }
+
+                        dataPtr += nChan;
+                        maskDataPtr += maskNChan;
+                    }
+
+                    dataPtr += padding;
+                    maskDataPtr += maskPadding;
+                }
             }
         }
 
@@ -3699,7 +3908,7 @@ namespace SS_OpenCV
 
                 Image<Bgr, byte> imgCopyPadded = new Image<Bgr, Byte>(img.Width + halfDim * 2, img.Height + halfDim * 2);
                 // Pad the copy image using OpenCV
-                CvInvoke.CopyMakeBorder(img, imgCopyPadded, halfDim, halfDim, halfDim, halfDim, Emgu.CV.CvEnum.BorderType.Replicate);
+                CvInvoke.CopyMakeBorder(img, imgCopyPadded, halfDim, halfDim, halfDim, halfDim, BorderType.Replicate);
                 MIplImage mCopy = imgCopyPadded.MIplImage;
                 byte* dataPtrCopy = (byte*)mCopy.ImageData.ToPointer(); // Pointer to the image
 
