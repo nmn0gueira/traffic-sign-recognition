@@ -3252,7 +3252,6 @@ namespace SS_OpenCV
                     })
                     .ToList();
 
-
             void preprocessImage(Image<Bgr, byte> image)
             {
                 /*
@@ -3279,22 +3278,23 @@ namespace SS_OpenCV
 
                 if (circularity > 0.65) // Some signs may appear from a different perspective so a little tolerance is given
                 {
-                    Image<Bgr, byte> roi = imgDest.Copy(component.BoundingBox);
+                    // Make a copy that will be used for the character extraction and recognition
+                    Image<Bgr, byte> copyCER = imgDest.Copy();
 
                     // Filter out points in the image that are not part of the hull area and extract the ROI for the component
-                    Mat bitmask = new Mat(GetBitmaskFromPoints(imgDest, component.HullPoints.ToHashSet()), component.BoundingBox);
+                    Mat bitmask = GetBitmaskFromPoints(imgDest, component.HullPoints.ToHashSet());
 
                     // We apply the bitmask so we are only working with the sign and everything else is white
-                    FilterImage(roi, bitmask, Color.White);
+                    FilterImage(copyCER, bitmask, Color.White);
 
                     // Preprocessing to make sure the numbers (if they exist) are the only components in the image
-                    RedChannel(roi);
-                    Negative(roi);
-                    ConvertToBW(roi, 190);
-                    Opening(roi, new[,] { { true, true, true }, { true, true, true }, { true, true, true } });
+                    RedChannel(copyCER);
+                    Negative(copyCER);
+                    ConvertToBW(copyCER, 190);
+                    Opening(copyCER, new[,] { { true, true, true }, { true, true, true }, { true, true, true } });
 
                     // Extract digits (if they exist)
-                    var digitComponents = ConnectedComponents(roi, colorComponents: false);
+                    var digitComponents = ConnectedComponents(copyCER, colorComponents: false);
 
                     // If the number of components disallows them from being a speed sign
                     if (digitComponents.Count < 2 || digitComponents.Count > 3)
@@ -3303,7 +3303,7 @@ namespace SS_OpenCV
                     }
                     else
                     {
-                        sinal = ClassifyDigits(digitComponents, roi);
+                        sinal = ClassifyDigits(digitComponents, copyCER);
                     }
                 }
                 else
@@ -3374,108 +3374,6 @@ namespace SS_OpenCV
                 imgDest.Draw(sinal.sinalRect, new Bgr(0, 255, 0), 2);
                 sinalResult.results.Add(sinal);
             }
-
-            /*
-            foreach (var obj in connectedComponents)
-            {
-
-                Sinal sinal = new Sinal();
-
-                sinal.sinalRect = obj.BoundingBox;
-
-                var circularity = 4 * obj.HullArea / (Math.PI * Math.Pow(obj.MaxDiameter, 2));  // Since the traffic sign components will be donut shaped, we need the hull area
-                
-                if (circularity > 0.65) // Some signs may appear from a different perspective so a little tolerance is given
-                {
-                    Image<Bgr, byte> trafficSignROI = imgDest.Copy(obj.BoundingBox);
-
-                    // Filter out points in the image that are not part of the hull area and extract the ROI for the component
-                    Mat bitmaskROI = new Mat(GetBitmaskFromPoints(imgDest, obj.HullPoints.ToHashSet()), obj.BoundingBox);
-
-                    // We apply the bitmask so we are only working with the sign and everything else is white
-                    FilterImage(trafficSignROI, bitmaskROI, Color.White);
-
-                    // Preprocessing to make sure the numbers (if they exist) are the only components in the image
-                    RedChannel(trafficSignROI);
-                    Negative(trafficSignROI);
-                    ConvertToBW(trafficSignROI, 190);
-                    Opening(trafficSignROI, mask);
-
-                    // Extract digits (if they exist)
-                    List<ConnectedComponent> digitComponents = ConnectedComponents(trafficSignROI, colorComponents: false);
-                    
-                    // If number of components disallows them from being a speed sign
-                    if (digitComponents.Count < 2 || digitComponents.Count > 3)
-                    {
-                        sinal.sinalEnum = ResultsEnum.sinal_proibicao;
-                    }
-
-                    else
-                    {
-                        List<Digito> digitObjects = new List<Digito>();
-
-                        foreach (var digitComponent in digitComponents)
-                        {
-                            Image<Bgr, byte> digitROI = trafficSignROI.Copy(digitComponent.BoundingBox);
-                            Negative(digitROI);
-                            List<(int, Image<Bgr, byte>)> digitImages = loadDigitTemplates(digitROI.Height, digitROI.Width);
-
-                            int bestScoreDigit = -1;
-                            float bestScore = 0;
-                            Image<Bgr, byte> bestMatch = null;
-
-                            foreach ((int digit, Image<Bgr, byte> digitImage) in digitImages)
-                            {                               
-                                float score = ComputeSimilarity(digitROI, digitImage);
-                                if (score > bestScore)
-                                {
-                                    bestScoreDigit = digit;
-                                    bestScore = score;
-                                    bestMatch = digitImage;
-                                }
-                            }
-
-                            if (bestScore < 0.7) // If the best match is not good enough, do not consider it
-                            {
-                                break;
-                            }
-
-                            Digito digitObject = new Digito
-                            {
-                                digitoRect = digitComponent.BoundingBox,
-                                digito = bestScoreDigit.ToString()
-                            };
-                            digitObjects.Add(digitObject);
-                        }
-
-                        // If the number of digits is not the same as the number of components, it is not a speed sign
-                        if (digitObjects.Count != digitComponents.Count || !digitObjects.Any(d => d.digito == "0"))
-                        {
-                            sinal.sinalEnum = ResultsEnum.sinal_proibicao;
-                        }
-
-                        else
-                        {
-                            sinal.sinalEnum = ResultsEnum.sinal_limite_velocidade;
-                            sinal.digitos = digitObjects;
-                        }
-                    }
-                }
-                else if (true)  // Check for danger signs
-                {
-                    sinal.sinalEnum = ResultsEnum.sinal_perigo;
-                }
-
-                else           // Unknown sign
-                {
-                    sinal.sinalEnum = ResultsEnum.unknown;
-                    sinalResult.results.Add(sinal);
-                    continue;
-                }
-
-                imgDest.Draw(sinal.sinalRect, new Bgr(0, 255, 0), 2);
-                sinalResult.results.Add(sinal);
-            }*/
         }
 
         /// <summary>
