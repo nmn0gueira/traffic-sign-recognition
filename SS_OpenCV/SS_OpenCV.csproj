@@ -188,6 +188,16 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Resources\Digits\0.png" />
+    <EmbeddedResource Include="Resources\Digits\1.png" />
+    <EmbeddedResource Include="Resources\Digits\2.png" />
+    <EmbeddedResource Include="Resources\Digits\3.png" />
+    <EmbeddedResource Include="Resources\Digits\4.png" />
+    <EmbeddedResource Include="Resources\Digits\5.png" />
+    <EmbeddedResource Include="Resources\Digits\6.png" />
+    <EmbeddedResource Include="Resources\Digits\7.png" />
+    <EmbeddedResource Include="Resources\Digits\8.png" />
+    <EmbeddedResource Include="Resources\Digits\9.png" />
     <Content Include="Resources\logo_nova_short.ico" />
     <Content Include="Resources\logo_nova_short.png" />
   </ItemGroup>

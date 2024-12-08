@@ -8,6 +8,7 @@ using Emgu.CV.CvEnum;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
+using System.Reflection;
 
 
 namespace SS_OpenCV
@@ -3239,18 +3240,50 @@ namespace SS_OpenCV
         /// <param name="sinalResult">Objecto resultado - lista de sinais e respectivas informaçoes</param>
         public static void SinalReader(Image<Bgr, byte> imgDest, Image<Bgr, byte> imgOrig, int level, out Results sinalResult)
         {
-            // Assumes directory only has images for digits that are named with their respective digit
-            const string directory = "C:\\Users\\nmnog\\Documents\\Universidade\\2024-25\\1º Semestre\\Opcional\\SS\\Projetos\\1º Projeto\\SS_OpenCV_Base\\Imagens\\digitos";
-            List<(int, Image<Bgr, byte>)> digitTemplates = Directory
-                    .GetFiles(directory, "*.png")
-                    .Select(file =>
+            List<(int, Image<Bgr, byte>)> loadDigitTemplatesFromResources()
+            {
+                var templates = new List<(int, Image<Bgr, byte>)>();
+                var assembly = Assembly.GetExecutingAssembly();
+
+                // Define the namespace and folder path (adjust to match your project structure)
+                const string resourcePrefix = "SS_OpenCV.Resources.Digits";
+
+                var resourceNames = assembly.GetManifestResourceNames()
+                    .Where(name => name.StartsWith(resourcePrefix) && name.EndsWith(".png"));
+
+                foreach (var resourceName in resourceNames)
+                {
+                    Stream stream = null;
+                    try
                     {
-                        var image = new Image<Bgr, byte>(file);
-                        ConvertToBW_Otsu(image);
-                        int digit = int.Parse(Path.GetFileNameWithoutExtension(file));
-                        return (digit, image);
-                    })
-                    .ToList();
+                        stream = assembly.GetManifestResourceStream(resourceName);
+                        if (stream != null)
+                        {
+                            // Load the image as a Bitmap
+                            using (var bitmap = new Bitmap(stream))
+                            {
+                                var digitImage = new Image<Bgr, byte>(bitmap);
+                                ConvertToBW_Otsu(digitImage);
+
+                                // Extract the digit from the resource name (e.g., "Digits.3.png" -> "3")
+                                string digitString = Path.GetFileNameWithoutExtension(resourceName).Split('.').Last();
+                                int digit = int.Parse(digitString);
+
+                                templates.Add((digit, digitImage));
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        stream?.Dispose(); // Explicitly dispose the stream
+                    }
+                }
+
+                return templates;
+            }
+
+
+            List<(int, Image<Bgr, byte>)> digitTemplates = loadDigitTemplatesFromResources();
 
             void preprocessImage(Image<Bgr, byte> image)
             {
