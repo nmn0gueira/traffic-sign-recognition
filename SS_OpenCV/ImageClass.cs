@@ -147,7 +147,7 @@ namespace SS_OpenCV
                 get
                 {
                     if (_hullExtremities.Count == 0)
-                        _hullExtremities = CalculateHullExtremities();  // For convex hull operations 8-connectivity for perimeter is always used
+                        _hullExtremities = CalculateHullExtremities();
                     return _hullExtremities;
                 }
             }
@@ -3263,6 +3263,7 @@ namespace SS_OpenCV
                             using (var bitmap = new Bitmap(stream))
                             {
                                 var digitImage = new Image<Bgr, byte>(bitmap);
+                                Negative(digitImage);
                                 ConvertToBW_Otsu(digitImage);
 
                                 // Extract the digit from the resource name (e.g., "Digits.3.png" -> "3")
@@ -3285,7 +3286,7 @@ namespace SS_OpenCV
 
             List<(int, Image<Bgr, byte>)> digitTemplates = loadDigitTemplatesFromResources();
 
-            void preprocessImage(Image<Bgr, byte> image)
+            void preprocessImage(Image<Bgr, byte> img)
             {
                 /*
                  * These values restrict the ranges of red to those used in traffic signs. The hue range for the red color is 340-20 (170-10 in OpenCV), 
@@ -3295,11 +3296,11 @@ namespace SS_OpenCV
                 const int minSat = 150, maxSat = 255;
                 const int minValue = 70, maxValue = 255;
 
-                BinarizeOnColor(image, hueLower, hueUpper, minSat, maxSat, minValue, maxValue);
+                BinarizeOnColor(img, hueLower, hueUpper, minSat, maxSat, minValue, maxValue);
 
                 var mask = new[,] { { true, true, true }, { true, true, true }, { true, true, true } };
-                Closing(image, mask);
-                Opening(image, mask);
+                Closing(img, mask);
+                Opening(img, mask);
             }
 
             Sinal ClassifySign(ConnectedComponent component)
@@ -3349,15 +3350,14 @@ namespace SS_OpenCV
                 return sinal;
             }
 
-            Sinal ClassifyDigits(List<ConnectedComponent> digitComponents, Image<Bgr, byte> roi)
+            Sinal ClassifyDigits(List<ConnectedComponent> digitComponents, Image<Bgr, byte> img)
             {
                 Sinal sinal = new Sinal();
                 var digits = new List<Digito>();
 
                 foreach (var digitComp in digitComponents)
                 {
-                    Image<Bgr, byte> digitRoi = roi.Copy(digitComp.BoundingBox);
-                    Negative(digitRoi);
+                    Image<Bgr, byte> digitRoi = img.Copy(digitComp.BoundingBox);
 
                     int bestDigit = -1;
                     float bestScore = 0;
