@@ -107,6 +107,9 @@
             this.ImageViewer = new Emgu.CV.UI.ImageBox();
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
             this.statusLabel = new System.Windows.Forms.ToolStripStatusLabel();
+            this.serialPort1 = new System.IO.Ports.SerialPort(this.components);
+            this.serialToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.openSerialPortToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip1.SuspendLayout();
             this.panel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.ImageViewer)).BeginInit();
@@ -124,6 +127,7 @@
             this.fileToolStripMenuItem,
             this.editToolStripMenuItem,
             this.imageToolStripMenuItem,
+            this.serialToolStripMenuItem,
             this.autoresToolStripMenuItem,
             this.evalToolStripMenuItem});
             this.menuStrip1.Location = new System.Drawing.Point(0, 0);
@@ -732,6 +736,25 @@
             this.statusLabel.Size = new System.Drawing.Size(60, 20);
             this.statusLabel.Text = "X :-   Y:-";
             // 
+            // serialPort1
+            // 
+            this.serialPort1.DataReceived += new System.IO.Ports.SerialDataReceivedEventHandler(this.serialPort1_DataReceived);
+            // 
+            // serialToolStripMenuItem
+            // 
+            this.serialToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.openSerialPortToolStripMenuItem});
+            this.serialToolStripMenuItem.Name = "serialToolStripMenuItem";
+            this.serialToolStripMenuItem.Size = new System.Drawing.Size(60, 24);
+            this.serialToolStripMenuItem.Text = "Serial";
+            // 
+            // openSerialPortToolStripMenuItem
+            // 
+            this.openSerialPortToolStripMenuItem.Name = "openSerialPortToolStripMenuItem";
+            this.openSerialPortToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.openSerialPortToolStripMenuItem.Text = "Open Serial Port";
+            this.openSerialPortToolStripMenuItem.Click += new System.EventHandler(this.openSerialPortToolStripMenuItem_Click);
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -836,6 +859,9 @@
         private System.Windows.Forms.ToolStripMenuItem closingToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem debugOnlyToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem filterImageBitmaskToolStripMenuItem;
+        private System.IO.Ports.SerialPort serialPort1;
+        private System.Windows.Forms.ToolStripMenuItem serialToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem openSerialPortToolStripMenuItem;
     }
 }
 

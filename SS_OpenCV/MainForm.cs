@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO.Ports;
 using System.Linq;
+using System.Numerics;
+using System.Threading;
 using System.Windows.Forms;
 using Emgu.CV;
 using Emgu.CV.Structure;
@@ -15,6 +18,8 @@ namespace SS_OpenCV
         string title_bak = "";
         int mouseX, mouseY;
         bool mouseFlag = false;
+        float sensorTemperature, sensorLight;
+        (bool, bool) newSensorDataAvailable;
 
         public MainForm()
         {
@@ -169,7 +174,7 @@ namespace SS_OpenCV
             if (form.DialogResult == DialogResult.OK)
             {
                 int brightness = Convert.ToInt32(form.ValueTextBox1.Text);
-                int contrast = Convert.ToInt32(form.ValueTextBox2.Text);
+                double contrast = Convert.ToDouble(form.ValueTextBox2.Text);
 
                 //copy Undo Image
                 imgUndo = img.Copy();
@@ -185,19 +190,57 @@ namespace SS_OpenCV
 
         private void sensorToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if (img == null) // verify if the image is already opened
-                return;
-            Cursor = Cursors.WaitCursor; // clock cursor 
+            int MapLightToBrightness(float luxLight)
+            {
+                return (int) Math.Round(-0.502 * Math.Log(luxLight) + 5.2014);
+            }
 
-            //copy Undo Image
-            imgUndo = img.Copy();
+            double MapTemperatureToContrast(float celsiusTemperature)
+            {
+                return -0.0436 * celsiusTemperature + 4.4882;
+            }
 
-            ImageClass.ConvertToGray(img);
+            if (serialPort1.IsOpen) // Ensure serial port is open
+            {
+                if (img == null) // verify if the image is already opened
+                    return;
+             
 
-            ImageViewer.Image = img;
-            ImageViewer.Refresh(); // refresh image on the screen
+                //copy Undo Image
+                imgUndo = img.Copy();
 
-            Cursor = Cursors.Default; // normal cursor
+                mouseFlag = true;
+                while (mouseFlag) // wait for mouse click
+                {
+                    DateTime start = DateTime.Now;
+                    while ((DateTime.Now - start).TotalMilliseconds < 1000 && !newSensorDataAvailable.Equals((true, true)))
+                    {
+                        Application.DoEvents();
+                    }
+
+                    if (newSensorDataAvailable.Equals((true, true))) {
+
+                        newSensorDataAvailable = (false, false);
+                        Cursor = Cursors.WaitCursor; // clock cursor 
+
+                        ImageClass.BrightContrast(img, MapLightToBrightness(sensorLight), MapTemperatureToContrast(sensorTemperature));
+                        Console.WriteLine($"Light: {sensorLight}, Temperature: {sensorTemperature}");
+
+                        ImageViewer.Image = img;
+                        ImageViewer.Refresh(); // refresh image on the screen
+
+                        Cursor = Cursors.Default; // normal cursor
+                    }
+                    else
+                    {
+                        Thread.Sleep(50);
+                    }
+                }                       
+            }
+            else
+            {
+                MessageBox.Show("Serial port is not open. Please check your connection.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void redChannelToolStripMenuItem_Click(object sender, EventArgs e)
@@ -310,7 +353,7 @@ namespace SS_OpenCV
              */
             int hueLowerBound = 170, hueUpperBound = 5; // int hueLowerBound = 105, hueUpperBound = 135; // Blue hue, for example
             int minSaturation = 150, maxSaturation = 255;
-            int minValue = 70, maxValue = 255; // previously, minValue was 50
+            int minValue = 70, maxValue = 255;
 
             ImageClass.BinarizeOnColor(img, hueLowerBound, hueUpperBound, minSaturation, maxSaturation, minValue, maxValue);
 
@@ -604,6 +647,7 @@ namespace SS_OpenCV
 
             Cursor = Cursors.Default; // normal cursor
         }
+
 
         private void nonUniformToolStripMenuItem_Click(object sender, EventArgs e)
         {
@@ -1063,6 +1107,55 @@ namespace SS_OpenCV
                 mouseY = e.Y;
 
                 mouseFlag = false;
+            }
+        }
+
+        private void serialPort1_DataReceived(object sender, SerialDataReceivedEventArgs e)
+        {
+            try
+            {
+                string data = serialPort1.ReadLine();      
+
+                Invoke((MethodInvoker)delegate
+                {
+                    string sensorData = data.Split(':').LastOrDefault().Trim();
+                    if (data.Contains("Temperature"))
+                    {
+                        sensorTemperature = float.Parse(sensorData);
+                        newSensorDataAvailable.Item1 = true;
+                    }
+                    else if (data.Contains("Light"))
+                    {
+                        sensorLight = float.Parse(sensorData);
+                        newSensorDataAvailable.Item2 = true;
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error reading serial port data: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void openSerialPortToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (!serialPort1.IsOpen)
+                {
+                    serialPort1.PortName = "COM3";
+                    serialPort1.BaudRate = 9600;
+                    serialPort1.Parity = Parity.None;
+                    serialPort1.DataBits = 8;
+                    serialPort1.StopBits = StopBits.One;
+
+                    serialPort1.Open();
+                    MessageBox.Show("Serial port opened successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to open serial port: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

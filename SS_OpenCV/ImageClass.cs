@@ -8,7 +8,6 @@ using Emgu.CV.CvEnum;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
-using System.Threading.Tasks;
 
 
 namespace SS_OpenCV
@@ -417,6 +416,7 @@ namespace SS_OpenCV
                 }
             }
         }
+
 
         public static void Negative(Image<Bgr, byte> img)
         {
