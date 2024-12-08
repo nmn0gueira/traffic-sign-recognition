@@ -3240,49 +3240,144 @@ namespace SS_OpenCV
         public static void SinalReader(Image<Bgr, byte> imgDest, Image<Bgr, byte> imgOrig, int level, out Results sinalResult)
         {
             // Assumes directory only has images for digits that are named with their respective digit
-            List<(int, Image<Bgr, byte>)> getDigitsPreprocessed(int height, int width)
+            const string directory = "C:\\Users\\nmnog\\Documents\\Universidade\\2024-25\\1º Semestre\\Opcional\\SS\\Projetos\\1º Projeto\\SS_OpenCV_Base\\Imagens\\digitos";
+            List<(int, Image<Bgr, byte>)> digitTemplates = Directory
+                    .GetFiles(directory, "*.png")
+                    .Select(file =>
+                    {
+                        var image = new Image<Bgr, byte>(file);
+                        ConvertToBW_Otsu(image);
+                        int digit = int.Parse(Path.GetFileNameWithoutExtension(file));
+                        return (digit, image);
+                    })
+                    .ToList();
+
+
+            void preprocessImage(Image<Bgr, byte> image)
             {
-                string filePath = "C:\\Users\\nmnog\\Documents\\Universidade\\2024-25\\1º Semestre\\Opcional\\SS\\Projetos\\1º Projeto\\SS_OpenCV_Base\\Imagens\\digitos";
-                string filePattern = "*.png";
+                /*
+                 * These values restrict the ranges of red to those used in traffic signs. The hue range for the red color is 340-20 (170-10 in OpenCV), 
+                 * the saturation and value would be adjusted in kind.
+                 */
+                const int hueLower = 170, hueUpper = 5;
+                const int minSat = 150, maxSat = 255;
+                const int minValue = 70, maxValue = 255;
 
-                List<(int, Image<Bgr, byte>)> digitImages = new List<(int, Image<Bgr, byte>)>();
+                BinarizeOnColor(image, hueLower, hueUpper, minSat, maxSat, minValue, maxValue);
 
-                string[] digitImageFiles = Directory.GetFiles(filePath, filePattern);
-                foreach (string digitImageFile in digitImageFiles)
+                var mask = new[,] { { true, true, true }, { true, true, true }, { true, true, true } };
+                Closing(image, mask);
+                Opening(image, mask);
+            }
+
+            Sinal ClassifySign(ConnectedComponent component)
+            {
+                Sinal sinal = new Sinal();
+
+                // Since the traffic sign components will be donut shaped, we need the hull area
+                var circularity = 4 * component.HullArea / (Math.PI * Math.Pow(component.MaxDiameter, 2));
+
+                if (circularity > 0.65) // Some signs may appear from a different perspective so a little tolerance is given
                 {
-                    Image<Bgr, byte> digitImage = new Image<Bgr, byte>(digitImageFile);
-                    ConvertToBW_Otsu(digitImage);
-                    int digit = int.Parse(Path.GetFileNameWithoutExtension(digitImageFile));
-                    digitImages.Add((digit, digitImage.Resize(width, height, Inter.Linear)));
+                    Image<Bgr, byte> roi = imgDest.Copy(component.BoundingBox);
+
+                    // Filter out points in the image that are not part of the hull area and extract the ROI for the component
+                    Mat bitmask = new Mat(GetBitmaskFromPoints(imgDest, component.HullPoints.ToHashSet()), component.BoundingBox);
+
+                    // We apply the bitmask so we are only working with the sign and everything else is white
+                    FilterImage(roi, bitmask, Color.White);
+
+                    // Preprocessing to make sure the numbers (if they exist) are the only components in the image
+                    RedChannel(roi);
+                    Negative(roi);
+                    ConvertToBW(roi, 190);
+                    Opening(roi, new[,] { { true, true, true }, { true, true, true }, { true, true, true } });
+
+                    // Extract digits (if they exist)
+                    var digitComponents = ConnectedComponents(roi, colorComponents: false);
+
+                    // If the number of components disallows them from being a speed sign
+                    if (digitComponents.Count < 2 || digitComponents.Count > 3)
+                    {
+                        sinal.sinalEnum = ResultsEnum.sinal_proibicao;
+                    }
+                    else
+                    {
+                        sinal = ClassifyDigits(digitComponents, roi);
+                    }
                 }
-                return digitImages;
+                else
+                {
+                    sinal.sinalEnum = ResultsEnum.sinal_perigo; // Default to "danger" if not circular
+                }
+
+                sinal.sinalRect = component.BoundingBox;
+
+                return sinal;
+            }
+
+            Sinal ClassifyDigits(List<ConnectedComponent> digitComponents, Image<Bgr, byte> roi)
+            {
+                Sinal sinal = new Sinal();
+                var digits = new List<Digito>();
+
+                foreach (var digitComp in digitComponents)
+                {
+                    Image<Bgr, byte> digitRoi = roi.Copy(digitComp.BoundingBox);
+                    Negative(digitRoi);
+
+                    int bestDigit = -1;
+                    float bestScore = 0;
+
+                    foreach (var (digit, template) in digitTemplates)
+                    {
+                        Image<Bgr, byte> resizedImage = template.Resize(digitRoi.Width, digitRoi.Height, Inter.Linear);
+                        float score = ComputeSimilarity(digitRoi, resizedImage);
+                        if (score > bestScore)
+                        {
+                            bestDigit = digit;
+                            bestScore = score;
+                        }
+                    }
+
+                    if (bestScore < 0.7) break; // Invalidate if no strong match
+
+                    digits.Add(new Digito { digitoRect = digitComp.BoundingBox, digito = bestDigit.ToString() });
+                }
+
+                // If the number of digits is not the same as the number of components or it does not contain the number 0, it is not a speed sign
+                if (digits.Count != digitComponents.Count || !digits.Any(d => d.digito == "0"))
+                {
+                    sinal.sinalEnum = ResultsEnum.sinal_proibicao;
+                }
+                else
+                {
+                    sinal.sinalEnum = ResultsEnum.sinal_limite_velocidade;
+                    sinal.digitos = digits;
+                }
+
+                return sinal;
             }
 
             Image<Bgr, byte> imgCopy = imgOrig.Copy();
-            /*
-             * These values restrict the ranges of red to those used in traffic signs. The hue range for the red color is 340-20 (170-10 in OpenCV), 
-             * the saturation and value would be adjusted in kind.
-             */
-            int hueLowerBound = 170, hueUpperBound = 5; // int hueLowerBound = 105, hueUpperBound = 135; // Blue hue, for example
-            int minSaturation = 150, maxSaturation = 255;
-            int minValue = 70, maxValue = 255; // previously, minValue was 50
+            preprocessImage(imgCopy);
 
-            BinarizeOnColor(imgCopy, hueLowerBound, hueUpperBound, minSaturation, maxSaturation, minValue, maxValue);
-
-            bool[,] mask = new bool[3, 3] { { true, true, true }, { true, true, true }, { true, true, true } };
-            Closing(imgCopy, mask);
-            Opening(imgCopy, mask);
-
-            List<ConnectedComponent> connectedComponents = ConnectedComponents(imgCopy, colorComponents: false);
-
-            float minArea = imgCopy.Height * imgCopy.Width * 0.001f;  // 0.1% of image size
+            var components = ConnectedComponents(imgCopy, colorComponents: false)
+                .Where(c => c.Area >= imgCopy.Height * imgCopy.Width * 0.001f) // Filter out small components (< 0.1% of image size)
+                .ToList();
 
             sinalResult = new Results();
 
+            foreach (var component in components)
+            {
+                var sinal = ClassifySign(component);
+                imgDest.Draw(sinal.sinalRect, new Bgr(0, 255, 0), 2);
+                sinalResult.results.Add(sinal);
+            }
+
+            /*
             foreach (var obj in connectedComponents)
             {
-                if (obj.Area < minArea) // Noise that can be ignored
-                    continue;
 
                 Sinal sinal = new Sinal();
 
@@ -3323,7 +3418,7 @@ namespace SS_OpenCV
                         {
                             Image<Bgr, byte> digitROI = trafficSignROI.Copy(digitComponent.BoundingBox);
                             Negative(digitROI);
-                            List<(int, Image<Bgr, byte>)> digitImages = getDigitsPreprocessed(digitROI.Height, digitROI.Width);
+                            List<(int, Image<Bgr, byte>)> digitImages = loadDigitTemplates(digitROI.Height, digitROI.Width);
 
                             int bestScoreDigit = -1;
                             float bestScore = 0;
@@ -3380,7 +3475,7 @@ namespace SS_OpenCV
 
                 imgDest.Draw(sinal.sinalRect, new Bgr(0, 255, 0), 2);
                 sinalResult.results.Add(sinal);
-            }
+            }*/
         }
 
         /// <summary>
