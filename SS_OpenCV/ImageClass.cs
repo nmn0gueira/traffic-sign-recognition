@@ -3001,8 +3001,8 @@ namespace SS_OpenCV
             }
 
             IEnumerable<(int, int)> topBorderNeighbors = relativePoints.Where(point => point.Item2 > -1);
-            IEnumerable<(int, int)> upperLeftCornerNeigbors = topBorderNeighbors.Where(point => point.Item1 > -1);
-            IEnumerable<(int, int)> upperRightCornerNeigbors = topBorderNeighbors.Where(point => point.Item1 < 1);
+            IEnumerable<(int, int)> upperLeftCornerNeighbors = topBorderNeighbors.Where(point => point.Item1 > -1);
+            IEnumerable<(int, int)> upperRightCornerNeighbors = topBorderNeighbors.Where(point => point.Item1 < 1);
 
             IEnumerable<(int, int)> leftBorderNeighbors = relativePoints.Where(point => point.Item1 > -1);
             IEnumerable<(int, int)> rightBorderNeighbors = relativePoints.Where(point => point.Item1 < 1);
@@ -3014,12 +3014,12 @@ namespace SS_OpenCV
 
             // First pass (propagate labels top-down/left-right)
             // Treat top border
-            propagateLabel(0, 0, upperLeftCornerNeigbors);
+            propagateLabel(0, 0, upperLeftCornerNeighbors);
             for (int x = 1; x < width - 1; x++)
             {
                 propagateLabel(x, 0, topBorderNeighbors);
             }
-            propagateLabel(width - 1, 0, upperRightCornerNeigbors);
+            propagateLabel(width - 1, 0, upperRightCornerNeighbors);
 
             // Treat core
             for (int y = 1; y < height - 1; y++)
