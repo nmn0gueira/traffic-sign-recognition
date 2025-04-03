@@ -222,7 +222,7 @@ namespace SS_OpenCV
 
                         newSensorDataAvailable = (false, false);
                         Cursor = Cursors.WaitCursor; // clock cursor 
-
+                        img = imgUndo.Copy();
                         ImageClass.BrightContrast(img, MapLightToBrightness(sensorLight), MapTemperatureToContrast(sensorTemperature));
                         Console.WriteLine($"Light: {sensorLight}, Temperature: {sensorTemperature}");
 
